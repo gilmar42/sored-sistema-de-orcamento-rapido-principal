@@ -1,9 +1,0 @@
-{
-  "buildCommand": "npm run build",
-  "name": "sord-sistema-de-or-amento-rapido-principal-main-unique",
-  "installCommand": "npm install",
-  "env": {
-    "VITE_MP_PUBLIC_KEY": "@VITE_MP_PUBLIC_KEY",
-    "VITE_API_URL": "@VITE_API_URL"
-  }
-}
