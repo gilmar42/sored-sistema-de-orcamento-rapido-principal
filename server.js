@@ -14,6 +14,16 @@ const distPath = path.join(__dirname, 'frontend', 'dist');
 // Serve os arquivos estáticos
 app.use(express.static(distPath));
 
+// Rota de Check-in de Emergência (Para provar o Deploy)
+app.get('/api/check-in', (req, res) => {
+    res.json({
+        status: 'DEPLOY_SUCCESS_V2',
+        timestamp: new Date().toISOString(),
+        cwd: process.cwd(),
+        backend_env: process.env.NODE_ENV
+    });
+});
+
 // Manda tudo que não for requisição da API para o Roteador do React (index.html)
 app.use((req, res, next) => {
     if (req.url.startsWith('/api')) {
