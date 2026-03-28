@@ -181,32 +181,74 @@ router.get('/subscriptions/:id', async (req, res) => {
 // POST /webhooks: Recebe notificações do Mercado Pago
 router.post('/webhooks', async (req, res) => {
   try {
-    const { type, data } = req.body;
-    if (type !== 'preapproval') return res.status(200).send('ignorado');
-    const mpSubscriptionId = data && data.id;
-    if (!mpSubscriptionId) return res.status(400).send('id ausente');
-    const subscription = await Subscription.findOne({ mpSubscriptionId });
-    if (!subscription) return res.status(404).send('assinatura não encontrada');
-    // Busca status atualizado no Mercado Pago
-    const mpResult = await preApproval.findById({ id: mpSubscriptionId });
-    const newStatus = mpResult.status;
-    // Idempotência: só atualiza se mudou
-    if (subscription.status !== newStatus) {
-      subscription.status = newStatus;
-      subscription.nextBilling = mpResult.auto_recurring?.next_payment_date;
-      // Grace period: 3 dias se pending/failure
-      if (["pending", "failure"].includes(newStatus)) {
-        const grace = new Date();
-        grace.setDate(grace.getDate() + 3);
-        subscription.gracePeriodUntil = grace;
-      } else {
-        subscription.gracePeriodUntil = null;
-      }
-      subscription.updatedAt = new Date();
-      await subscription.save();
+    // 1. Extrair os headers para validação da assinatura
+    const signatureHeader = req.headers['x-signature'];
+    const requestId = req.headers['x-request-id'];
+
+    // 2. O body chega como Buffer devido ao express.raw no app.cjs
+    let rawBody = req.body;
+    let payload = {};
+
+    if (Buffer.isBuffer(rawBody)) {
+      payload = JSON.parse(rawBody.toString());
+    } else {
+      payload = rawBody; // Caso já venha como objeto (fallback do express.json)
     }
+
+    // [Opcional/Recomendado] Validação da Assinatura:
+    // const crypto = require('crypto');
+    // const ts = signatureHeader.split(',')[0].split('=')[1];
+    // const v1 = signatureHeader.split(',')[1].split('=')[1];
+    // const manifest = `id:${payload.data.id};request-id:${requestId};ts:${ts};`;
+    // const hmac = crypto.createHmac('sha256', process.env.MP_WEBHOOK_SECRET).update(manifest).digest('hex');
+    // se hmac !== v1 -> return unauthorized
+
+    console.log('[Webhook] Recebido MP Notificação:', payload.type, 'Action:', payload.action);
+
+    // Tipos de notificações (preapproval ou payment)
+    if (payload.type !== 'preapproval' && payload.action !== 'payment.created' && payload.action !== 'payment.updated') {
+      return res.status(200).send('ignorado');
+    }
+
+    if (payload.type === 'preapproval') {
+      const mpSubscriptionId = payload.data && payload.data.id;
+      if (!mpSubscriptionId) return res.status(400).send('id ausente');
+      
+      const subscription = await Subscription.findOne({ mpSubscriptionId });
+      if (subscription) {
+        const mpResult = await preApproval.findById({ id: mpSubscriptionId });
+        const newStatus = mpResult.status;
+        
+        if (subscription.status !== newStatus) {
+          subscription.status = newStatus;
+          subscription.nextBilling = mpResult.auto_recurring?.next_payment_date;
+          if (["pending", "failure"].includes(newStatus)) {
+            const grace = new Date();
+            grace.setDate(grace.getDate() + 3);
+            subscription.gracePeriodUntil = grace;
+          } else {
+            subscription.gracePeriodUntil = null;
+          }
+          subscription.updatedAt = new Date();
+          await subscription.save();
+        }
+      }
+    } else if (payload.action && payload.action.startsWith('payment')) {
+      // Aqui trataria pagamento via API normal (ex: PIX)
+      // O ID do pagamento vem em payload.data.id
+      const paymentId = payload.data && payload.data.id;
+      if (paymentId) {
+        const result = await mpPayment.get({ id: paymentId });
+        if (result?.status) {
+          db.prepare('UPDATE payments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE mp_payment_id = ?')
+            .run(result.status, paymentId);
+        }
+      }
+    }
+
     res.status(200).send('ok');
   } catch (error) {
+    console.error('Erro no Webhook:', error.message);
     res.status(500).json({ error: error.message });
   }
 });

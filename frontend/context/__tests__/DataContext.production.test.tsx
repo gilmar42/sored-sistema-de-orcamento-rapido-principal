@@ -48,7 +48,7 @@ describe('DataContext - Testes de Produção', () => {
   });
 
   const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <DataProvider testCurrentUser={{ id: 'test-user-id', tenantId: 'test-tenant-id', email: 'test@example.com', passwordHash: 'hashed' }}>
+    <DataProvider testCurrentUser={{ id: 'test-user-id', tenantId: 'test-tenant-id' }}>
       {children}
     </DataProvider>
   );

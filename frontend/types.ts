@@ -77,7 +77,7 @@ export interface CalculatedCosts {
 export interface User {
   id: string;
   email: string;
-  passwordHash: string; // "Hashed" for simulation
+  passwordHash?: string; // "Hashed" for simulation
   tenantId: string;
 }
 
