@@ -138,7 +138,7 @@ router.post('/login', async (req, res) => {
 // Verify token
 router.get('/verify', (req, res) => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
+    const token = req.cookies?.token || req.headers.authorization?.replace('Bearer ', '');
     if (!token) {
       return res.status(401).json({ error: 'No token provided' });
     }
@@ -148,5 +148,52 @@ router.get('/verify', (req, res) => {
     return res.status(401).json({ error: 'Invalid token' });
   }
 });
+
+// Refresh token
+router.post('/refresh', async (req, res) => {
+  try {
+    const refreshToken = req.cookies?.refreshToken;
+    if (!refreshToken) return res.status(401).json({ error: 'No refresh token' });
+
+    const [tokens] = await db.query('SELECT * FROM refresh_tokens WHERE token = ?', [refreshToken]);
+    const storedToken = tokens[0];
+
+    if (!storedToken || new Date(storedToken.expires_at) < new Date()) {
+      return res.status(401).json({ error: 'Invalid or expired refresh token' });
+    }
+
+    const [users] = await db.query('SELECT * FROM users WHERE id = ?', [storedToken.user_id]);
+    const user = users[0];
+
+    if (!user) return res.status(401).json({ error: 'User not found' });
+
+    const newToken = jwt.sign(
+      { userId: user.id, email: user.email, tenantId: user.tenant_id },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.cookie('token', newToken, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.json({ user: { id: user.id, email: user.email, tenantId: user.tenant_id } });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Logout
+router.post('/logout', async (req, res) => {
+  try {
+    const refreshToken = req.cookies?.refreshToken;
+    if (refreshToken) {
+      await db.query('DELETE FROM refresh_tokens WHERE token = ?', [refreshToken]);
+    }
+    res.clearCookie('token');
+    res.clearCookie('refreshToken');
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Logout failed' });
+  }
+});
+
 
 module.exports = router;

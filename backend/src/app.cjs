@@ -93,10 +93,12 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Backend server running on http://localhost:${PORT}`);
-  console.log(`📊 Database: MySQL`);
-  console.log(`🔐 JWT Authentication enabled`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Backend server running on http://localhost:${PORT}`);
+    console.log(`📊 Database: MySQL`);
+    console.log(`🔐 JWT Authentication enabled`);
+  });
+}
 
 module.exports = app;
