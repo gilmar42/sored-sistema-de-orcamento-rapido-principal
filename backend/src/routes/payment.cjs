@@ -7,11 +7,6 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-const db = require('../config/database');
-const dotenv = require('dotenv');
-
-dotenv.config();
-
 // Inicialização Preguiçosa do SDK Mercado Pago
 let mpConfig = null;
 function getMP() {
