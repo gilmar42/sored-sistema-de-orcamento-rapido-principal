@@ -73,9 +73,39 @@ const PORT = process.env.PORT || 9000;
 app.use('/api/payments/webhooks', express.raw({ type: '*/*' }));
 app.use(express.json({ limit: '10mb' }));
 
-// Health check
+// Health check & Diagnostics
 app.get('/api', (req, res) => {
   res.json({ message: 'SORED API is running! 🚀' });
+});
+
+app.get('/api/system-check', async (req, res) => {
+  try {
+    const db = require('./config/database');
+    const [rows] = await db.query('SELECT 1');
+    const envAudit = {
+      NODE_ENV: process.env.NODE_ENV || 'not set',
+      DB_HOST: process.env.DB_HOST ? '✅ Configurado' : '❌ FALTANDO',
+      DB_USER: process.env.DB_USER || '❌ FALTANDO',
+      DB_NAME: process.env.DB_NAME || '❌ FALTANDO',
+      MP_ACCESS_TOKEN: process.env.MP_ACCESS_TOKEN ? '✅ Configurado (Comprimento: ' + process.env.MP_ACCESS_TOKEN.length + ')' : '❌ FALTANDO',
+      JWT_SECRET: process.env.JWT_SECRET ? '✅ Configurado' : '❌ FALTANDO',
+      PORT: process.env.PORT || '9000 (default)',
+    };
+
+    res.json({
+      status: 'UP',
+      database: '✅ CONECTADO',
+      environment: envAudit,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: 'DOWN',
+      database: '❌ ERRO DE CONEXÃO: ' + err.message,
+      environment_keys_present: Object.keys(process.env).filter(k => k.includes('DB_') || k.includes('MP_') || k.includes('JWT')),
+      error: err.stack
+    });
+  }
 });
 
 // Routes
@@ -87,10 +117,15 @@ app.use('/api/categories', categoriesRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/payments', paymentsRoutes);
 
-// Error handler
+// Error handler (Transparente para DEBUG na Hostinger)
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+  console.error('❌ [SERVER ERROR]:', err.stack);
+  res.status(500).json({ 
+    error: 'Erro Interno do Servidor', 
+    message: err.message,
+    stack: err.stack,
+    hint: 'Este erro detalhado só aparece no Modo de Depuração que ativamos agora.'
+  });
 });
 
 if (require.main === module) {

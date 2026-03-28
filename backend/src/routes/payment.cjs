@@ -7,10 +7,28 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-const mpClient = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN });
-const preApproval = new PreApproval(mpClient);
-const preApprovalPlan = new PreApprovalPlan(mpClient);
-const mpPayment = new Payment(mpClient);
+const db = require('../config/database');
+const dotenv = require('dotenv');
+
+dotenv.config();
+
+// Inicialização Preguiçosa do SDK Mercado Pago
+let mpConfig = null;
+function getMP() {
+  const token = process.env.MP_ACCESS_TOKEN;
+  if (!token) throw new Error('MP_ACCESS_TOKEN não está definido no ambiente/.env');
+  
+  if (!mpConfig) {
+    const mpClient = new MercadoPagoConfig({ accessToken: token });
+    mpConfig = {
+      client: mpClient,
+      preApproval: new PreApproval(mpClient),
+      preApprovalPlan: new PreApprovalPlan(mpClient),
+      mpPayment: new Payment(mpClient)
+    };
+  }
+  return mpConfig;
+}
 
 const planConfig = {
   monthly: { amount: 100, description: 'Plano Mensal SORED' },
@@ -42,6 +60,7 @@ async function createMPPlan({ planType, price, frequency, frequencyType }) {
   };
   
   try {
+    const { preApprovalPlan } = getMP();
     const result = await preApprovalPlan.create({ body });
     return result.id;
   } catch (err) {
@@ -153,6 +172,7 @@ router.post('/pix', async (req, res) => {
       payer: { email },
     };
 
+    const { mpPayment } = getMP();
     const result = await mpPayment.create({ body, requestOptions: { idempotencyKey } });
     const qrCode = result?.point_of_interaction?.transaction_data?.qr_code || null;
     const qrCodeBase64 = result?.point_of_interaction?.transaction_data?.qr_code_base64 || null;
@@ -197,6 +217,7 @@ router.get('/pix/status/:paymentId', async (req, res) => {
     const { paymentId } = req.params;
     if (!paymentId) return res.status(400).json({ error: 'paymentId é obrigatório' });
 
+    const { mpPayment } = getMP();
     const result = await mpPayment.get({ id: paymentId });
     if (result?.status) {
       await db.query('UPDATE payments SET status = ? WHERE mp_payment_id = ?', [result.status, paymentId]);
@@ -247,6 +268,7 @@ router.post('/subscriptions', async (req, res) => {
       back_url: successUrl,
       status: 'authorized',
     };
+    const { preApproval } = getMP();
     const result = await preApproval.create({ body });
     // Salva assinatura no banco
     const nextBillRaw = result.auto_recurring?.next_payment_date;
@@ -312,6 +334,7 @@ router.post('/webhooks', async (req, res) => {
       const subscription = rows[0];
 
       if (subscription) {
+        const { preApproval } = getMP();
         const mpResult = await preApproval.findById({ id: mpSubscriptionId });
         const newStatus = mpResult.status;
         
@@ -342,6 +365,7 @@ router.post('/webhooks', async (req, res) => {
     } else if (payload.action && payload.action.startsWith('payment')) {
       const paymentId = payload.data && payload.data.id;
       if (paymentId) {
+        const { mpPayment } = getMP();
         const result = await mpPayment.get({ id: paymentId });
         if (result?.status) {
           await db.query('UPDATE payments SET status = ? WHERE mp_payment_id = ?', [result.status, paymentId]);
