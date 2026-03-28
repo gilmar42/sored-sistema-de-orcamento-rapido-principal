@@ -22,7 +22,7 @@
   "backend": "node backend/src/app.cjs",
   
     
-  "build": "vite build",
+  "build": "cross-env NODE_ENV=production vite build",
   
     
   "preview": "vite preview",

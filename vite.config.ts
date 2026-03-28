@@ -43,9 +43,7 @@ export default defineConfig(({ mode }) => {
         chunkSizeWarningLimit: 500,
         reportCompressedSize: false,
       },
-      define: {
-        'process.env.NODE_ENV': JSON.stringify(mode),
-      },
+
       resolve: {
         alias: {
           '@': path.resolve(__dirname, 'frontend'),
