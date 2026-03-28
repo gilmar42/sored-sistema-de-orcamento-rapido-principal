@@ -18,6 +18,8 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ open, onClose, pr
     holder: '',
     exp: '',
     cvv: '',
+    docType: 'CPF',
+    docNumber: '',
   });
   // Carregar chave do MercadoPago compatível com Vite e Jest
   const mpKey =
@@ -58,11 +60,13 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ open, onClose, pr
       if (!mp) throw new Error('Mercado Pago SDK não carregado');
       const [exp_month, exp_year] = card.exp.split('/').map(s => s.trim());
       const tokenResult = await mp.createCardToken({
-        cardNumber: card.number,
+        cardNumber: card.number.replace(/\s+/g, ''),
         cardholderName: card.holder,
         securityCode: card.cvv,
-        expirationMonth: exp_month,
-        expirationYear: exp_year,
+        cardExpirationMonth: exp_month,
+        cardExpirationYear: exp_year.length === 2 ? `20${exp_year}` : exp_year, // MP prefers 4-digit year typically
+        identificationType: card.docType,
+        identificationNumber: card.docNumber.replace(/\D/g, ''),
       });
       if (!tokenResult.id) throw new Error('Erro ao tokenizar cartão');
       setCardToken(tokenResult.id);
@@ -95,7 +99,14 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ open, onClose, pr
           <input className="w-1/2 mb-2 p-2 border rounded" placeholder="MM/AA" value={card.exp} onChange={e=>setCard(c=>({...c,exp:e.target.value}))} maxLength={5} />
           <input className="w-1/2 mb-2 p-2 border rounded" placeholder="CVV" value={card.cvv} onChange={e=>setCard(c=>({...c,cvv:e.target.value}))} maxLength={4} />
         </div>
-        <button className="w-full bg-green-600 text-white py-2 rounded mt-2" disabled={!selected||!email||!card.number||!card.holder||!card.exp||!card.cvv||loading} onClick={handleSubscribe}>
+        <div className="flex gap-2">
+          <select className="w-1/3 mb-2 p-2 border rounded" value={card.docType} onChange={e=>setCard(c=>({...c,docType:e.target.value}))}>
+            <option value="CPF">CPF</option>
+            <option value="CNPJ">CNPJ</option>
+          </select>
+          <input className="w-2/3 mb-2 p-2 border rounded" placeholder={`Número do ${card.docType}`} value={card.docNumber} onChange={e=>setCard(c=>({...c,docNumber:e.target.value}))} maxLength={18} />
+        </div>
+        <button className="w-full bg-green-600 text-white py-2 rounded mt-2" disabled={!selected||!email||!card.number||!card.holder||!card.exp||!card.cvv||!card.docNumber||loading} onClick={handleSubscribe}>
           {loading ? 'Processando...' : 'Assinar'}
         </button>
         {error && <div className="text-red-600 mt-2">{error}</div>}
