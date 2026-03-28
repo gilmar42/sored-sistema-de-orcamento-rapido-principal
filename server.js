@@ -1,3 +1,4 @@
+require('dotenv').config({ path: require('path').resolve(__dirname, 'backend', '.env') });
 const express = require('express');
 const path = require('path');
 const fs = require('fs');

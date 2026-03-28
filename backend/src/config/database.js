@@ -1,7 +1,6 @@
 const mysql = require('mysql2/promise');
-const dotenv = require('dotenv');
-// Carrega as variáveis de ambiente
-dotenv.config();
+// Conexão MySQL
+
 
 // Create connection pool
 const pool = mysql.createPool({
