@@ -63,19 +63,28 @@ function formatDT(d) {
 router.get('/plans', async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM plans');
+    
+    // Se não houver planos, retorna nulo mas com status 200 (evita erro 500 no frontend)
+    if (!rows || rows.length === 0) {
+      return res.json({ monthlyPlan: null, annualPlan: null });
+    }
+
     const plans = rows.reduce((acc, p) => {
       acc[p.planType] = p;
       return acc;
     }, {});
     
-    // Converte para o formato esperado pelo frontend (monthlyPlan, annualPlan)
     res.json({ 
       monthlyPlan: plans.monthly || null, 
       annualPlan: plans.annual || null 
     });
   } catch (error) {
     console.error('❌ [GET Plans Error]:', error.message);
-    res.status(500).json({ error: 'Erro ao buscar planos', details: error.message });
+    res.status(500).json({ 
+      error: 'Erro ao buscar planos no banco de dados', 
+      details: error.message,
+      hint: 'Verifique se a tabela "plans" existe e se as credenciais do DB no .env estão corretas.'
+    });
   }
 });
 
@@ -170,8 +179,15 @@ router.post('/pix', async (req, res) => {
     });
   } catch (error) {
     console.error('❌ [PIX Error]:', error.message);
-    if (error.response) console.error('MP Data Error:', JSON.stringify(error.response, null, 2));
-    return res.status(500).json({ error: 'Erro ao criar pagamento PIX', details: error.message });
+    if (error.response) {
+      console.error('MP Data Error:', JSON.stringify(error.response, null, 2));
+      return res.status(500).json({ 
+        error: 'Erro na API do Mercado Pago ao criar PIX', 
+        details: error.message,
+        mp_details: error.response 
+      });
+    }
+    return res.status(500).json({ error: 'Erro interno ao criar pagamento PIX', details: error.message });
   }
 });
 
