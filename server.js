@@ -28,6 +28,9 @@ app.use((req, res, next) => {
     }
 });
 
-// NOTA: O arquivo backend/src/app.cjs já executa o app.listen(), 
-// então ao chamar 'require' nele, o servidor já é colocado no ar.
-console.log('✅ Server.js carregado: Unificando Backend e Frontend na mesma porta para deploy!');
+// Inicia o servidor unificado
+const PORT = process.env.PORT || 9000;
+app.listen(PORT, () => {
+    console.log(`🚀 Unified Server running on http://localhost:${PORT}`);
+    console.log(`✅ Server.js carregado: Unificando Backend e Frontend na mesma porta para deploy!`);
+});
