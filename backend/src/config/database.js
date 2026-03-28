@@ -15,9 +15,15 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
+let initRetries = 0;
+const MAX_RETRIES = 3;
+
 async function initDB() {
+  let connection;
+  const isProduction = process.env.NODE_ENV === 'production';
   try {
-    const connection = await pool.getConnection();
+    console.log(`🔌 Conectando ao MySQL: ${process.env.DB_HOST} (User: ${process.env.DB_USER})`);
+    connection = await pool.getConnection();
 
     await connection.query(`
       CREATE TABLE IF NOT EXISTS tenants (
@@ -169,10 +175,10 @@ async function initDB() {
     `);
 
     console.log('✅ MySQL Database initialized successfully');
-    connection.release();
   } catch (error) {
-    if (error.code === 'ER_BAD_DB_ERROR') {
-      console.warn('⚠️ Database not found. Attempting automatic creation...');
+    if (error.code === 'ER_BAD_DB_ERROR' && !isProduction && initRetries < MAX_RETRIES) {
+      initRetries++;
+      console.warn(`⚠️ DB não encontrado localmente. Tentando criação (${initRetries}/${MAX_RETRIES})...`);
       try {
         const tempPool = mysql.createPool({
           host: process.env.DB_HOST || 'localhost',
@@ -183,21 +189,22 @@ async function initDB() {
         const dbName = process.env.DB_NAME || 'sored';
         await tempPool.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\``);
         await tempPool.end();
-        console.log('✅ Database created successfully. Retrying initialization...');
+        console.log('✅ Database criado com sucesso. Retentando...');
         return initDB();
       } catch (creationError) {
-        console.error('❌ Failed to create database automatically:', creationError.message);
-        console.error('Check your DB_USER permissions and Hostinger DB settings.');
+        console.error('❌ Falha ao criar banco de dados local:', creationError.message);
       }
     } else {
-      console.error('❌ Database Initialization Error:');
-      console.error('Code:', error.code);
-      console.error('Message:', error.message);
-      console.error('DB_HOST:', process.env.DB_HOST);
-      console.error('DB_USER:', process.env.DB_USER);
-      console.error('DB_PORT:', process.env.DB_PORT);
-      console.error('Check if MySQL is running and accessible from the production server.');
+      console.error('❌ ERRO CRÍTICO NA INICIALIZAÇÃO DO BANCO:');
+      console.error(`- Código: ${error.code}`);
+      console.error(`- Mensagem: ${error.message}`);
+      console.error(`- Host: ${process.env.DB_HOST}`);
+      console.error(`- Usuário: ${process.env.DB_USER}`);
+      console.error(`- Banco: ${process.env.DB_NAME}`);
+      console.error('DICA: Na Hostinger, certifique-se de que o banco e o usuário foram criados no hPanel.');
     }
+  } finally {
+    if (connection) connection.release();
   }
 }
 
