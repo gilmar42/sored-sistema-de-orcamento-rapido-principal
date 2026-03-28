@@ -19,6 +19,16 @@ const planConfig = {
 
 // Utilitário para criar plano no Mercado Pago
 async function createMPPlan({ planType, price, frequency, frequencyType }) {
+  // Mercado Pago v2 (PreApproval) requires an HTTPS back_url.
+  // We'll try to use the configured URL, but force HTTPS if possible, or use a valid placeholder.
+  let successUrl = process.env.MP_SUCCESS_URL || '';
+  
+  if (!successUrl || successUrl.includes('localhost')) {
+    // Falls back to a valid HTTPS URL if localhost is detected, as MP often rejects it for Plans.
+    const baseFrontendUrl = process.env.FRONTEND_URL_PRODUCTION || 'https://projeto-sored.vercel.app';
+    successUrl = `${baseFrontendUrl}/sucesso`;
+  }
+
   const body = {
     reason: `Plano ${planType === 'monthly' ? 'Mensal' : 'Anual'} SaaS`,
     auto_recurring: {
@@ -27,10 +37,18 @@ async function createMPPlan({ planType, price, frequency, frequencyType }) {
       transaction_amount: price,
       currency_id: 'BRL',
     },
+    back_url: successUrl,
     payment_methods_allowed: { payment_types: [{ id: 'credit_card' }] },
   };
-  const result = await preApprovalPlan.create({ body });
-  return result.id;
+  
+  try {
+    const result = await preApprovalPlan.create({ body });
+    return result.id;
+  } catch (err) {
+    console.error(`❌ MP Plan Creation Failed (${planType}):`, err.message);
+    if (err.response) console.error('MP Details:', JSON.stringify(err.response, null, 2));
+    throw err;
+  }
 }
 
 // FORMAT DATETIME
@@ -60,17 +78,28 @@ router.post('/plans', async (req, res) => {
     let [aRows] = await db.query('SELECT * FROM plans WHERE planType = ? LIMIT 1', ['annual']);
     let annualPlan = aRows[0];
     if (!annualPlan) {
-      const mpPlanId = await createMPPlan({ planType: 'annual', price: 1100, frequency: 1, frequencyType: 'years' });
+      const mpPlanId = await createMPPlan({ 
+        planType: 'annual', 
+        price: 1100, 
+        frequency: 12, 
+        frequencyType: 'months' 
+      });
       await db.query(
         'INSERT INTO plans (planType, mpPlanId, price, frequency, frequencyType) VALUES (?, ?, ?, ?, ?)',
-        ['annual', mpPlanId, 1100, 1, 'years']
+        ['annual', mpPlanId, 1100, 12, 'months']
       );
       const [aNewRows] = await db.query('SELECT * FROM plans WHERE planType = ? LIMIT 1', ['annual']);
       annualPlan = aNewRows[0];
     }
     res.status(201).json({ monthlyPlan, annualPlan });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    const fs = require('fs');
+    const logMsg = `\n[${new Date().toISOString()}] Plans Error: ${error.message}\n` + 
+                   (error.response ? JSON.stringify(error.response, null, 2) : error.stack) + '\n';
+    fs.appendFileSync('mp_errors.log', logMsg);
+    console.error('❌ [Plans Error]:', error.message);
+    if (error.response) console.error('MP Data Error:', JSON.stringify(error.response, null, 2));
+    res.status(500).json({ error: 'Erro ao inicializar planos no Mercado Pago', details: error.message });
   }
 });
 
@@ -120,8 +149,9 @@ router.post('/pix', async (req, res) => {
       expiresAt: result?.date_of_expiration || null,
     });
   } catch (error) {
-    console.error('PIX payment error:', error);
-    return res.status(500).json({ error: 'Erro ao criar pagamento PIX' });
+    console.error('❌ [PIX Error]:', error.message);
+    if (error.response) console.error('MP Data Error:', JSON.stringify(error.response, null, 2));
+    return res.status(500).json({ error: 'Erro ao criar pagamento PIX', details: error.message });
   }
 });
 
