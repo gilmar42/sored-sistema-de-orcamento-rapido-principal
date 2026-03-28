@@ -3,14 +3,9 @@ const router = express.Router();
 const { MercadoPagoConfig, PreApproval, PreApprovalPlan, Payment } = require('mercadopago');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
-const mongoose = require('mongoose');
 const dotenv = require('dotenv');
-const Plan = require('../models/Plan');
-const User = require('../models/User');
-const Subscription = require('../models/Subscription');
 
 dotenv.config();
-
 
 const mpClient = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN });
 const preApproval = new PreApproval(mpClient);
@@ -38,20 +33,40 @@ async function createMPPlan({ planType, price, frequency, frequencyType }) {
   return result.id;
 }
 
+// FORMAT DATETIME
+function formatDT(d) {
+  if (!d) return null;
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return null;
+  return dt.toISOString().slice(0, 19).replace('T', ' ');
+}
+
 // POST /plans: Cria planos mensal e anual
 router.post('/plans', async (req, res) => {
   try {
     // Cria plano mensal
-    let monthlyPlan = await Plan.findOne({ planType: 'monthly' });
+    let [rows] = await db.query('SELECT * FROM plans WHERE planType = ? LIMIT 1', ['monthly']);
+    let monthlyPlan = rows[0];
     if (!monthlyPlan) {
       const mpPlanId = await createMPPlan({ planType: 'monthly', price: 100, frequency: 1, frequencyType: 'months' });
-      monthlyPlan = await Plan.create({ planType: 'monthly', mpPlanId, price: 100, frequency: 1, frequencyType: 'months' });
+      await db.query(
+        'INSERT INTO plans (planType, mpPlanId, price, frequency, frequencyType) VALUES (?, ?, ?, ?, ?)',
+        ['monthly', mpPlanId, 100, 1, 'months']
+      );
+      const [mRows] = await db.query('SELECT * FROM plans WHERE planType = ? LIMIT 1', ['monthly']);
+      monthlyPlan = mRows[0];
     }
     // Cria plano anual
-    let annualPlan = await Plan.findOne({ planType: 'annual' });
+    let [aRows] = await db.query('SELECT * FROM plans WHERE planType = ? LIMIT 1', ['annual']);
+    let annualPlan = aRows[0];
     if (!annualPlan) {
       const mpPlanId = await createMPPlan({ planType: 'annual', price: 1100, frequency: 1, frequencyType: 'years' });
-      annualPlan = await Plan.create({ planType: 'annual', mpPlanId, price: 1100, frequency: 1, frequencyType: 'years' });
+      await db.query(
+        'INSERT INTO plans (planType, mpPlanId, price, frequency, frequencyType) VALUES (?, ?, ?, ?, ?)',
+        ['annual', mpPlanId, 1100, 1, 'years']
+      );
+      const [aNewRows] = await db.query('SELECT * FROM plans WHERE planType = ? LIMIT 1', ['annual']);
+      annualPlan = aNewRows[0];
     }
     res.status(201).json({ monthlyPlan, annualPlan });
   } catch (error) {
@@ -84,8 +99,8 @@ router.post('/pix', async (req, res) => {
     const qrCode = result?.point_of_interaction?.transaction_data?.qr_code || null;
     const qrCodeBase64 = result?.point_of_interaction?.transaction_data?.qr_code_base64 || null;
 
-    db.prepare(`INSERT INTO payments (id, plan_type, status, amount, currency, mp_payment_id, payer_email, idempotency_key, raw_payload, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`).run(
+    await db.query(`INSERT INTO payments (id, plan_type, status, amount, currency, mp_payment_id, payer_email, idempotency_key, raw_payload)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
       uuidv4(),
       planType,
       result?.status || 'pending',
@@ -95,7 +110,7 @@ router.post('/pix', async (req, res) => {
       email,
       idempotencyKey,
       JSON.stringify({ qrCode, qrCodeBase64, mp: result })
-    );
+    ]);
 
     return res.status(201).json({
       paymentId: result?.id,
@@ -118,8 +133,7 @@ router.get('/pix/status/:paymentId', async (req, res) => {
 
     const result = await mpPayment.get({ id: paymentId });
     if (result?.status) {
-      db.prepare('UPDATE payments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE mp_payment_id = ?')
-        .run(result.status, paymentId);
+      await db.query('UPDATE payments SET status = ? WHERE mp_payment_id = ?', [result.status, paymentId]);
     }
     return res.json({
       paymentId,
@@ -137,10 +151,25 @@ router.post('/subscriptions', async (req, res) => {
   try {
     const { email, token, planType } = req.body;
     if (!email || !token || !planType) return res.status(400).json({ error: 'email, token e planType são obrigatórios' });
-    const plan = await Plan.findOne({ planType });
+    
+    const [pRows] = await db.query('SELECT * FROM plans WHERE planType = ? LIMIT 1', [planType]);
+    const plan = pRows[0];
     if (!plan) return res.status(404).json({ error: 'Plano não encontrado' });
-    let user = await User.findOne({ email });
-    if (!user) user = await User.create({ email });
+
+    let [uRows] = await db.query('SELECT * FROM users WHERE email = ? LIMIT 1', [email]);
+    let user = uRows[0];
+    if (!user) {
+      // Create user if not created
+      const bcrypt = require('bcryptjs');
+      const userId = `U-${Date.now()}`;
+      const tenantId = `T-${Date.now()}`;
+      await db.query('INSERT INTO tenants (id, company_name) VALUES (?, ?)', [tenantId, 'Empresa Padrão']);
+      const pwHash = await bcrypt.hash(uuidv4(), 10);
+      await db.query('INSERT INTO users (id, email, password_hash, tenant_id) VALUES (?, ?, ?, ?)', [userId, email, pwHash, tenantId]);
+      
+      const [uNewRows] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
+      user = uNewRows[0];
+    }
     const baseFrontendUrl = process.env.FRONTEND_URL_PRODUCTION || process.env.FRONTEND_URL || 'http://localhost:5173';
     const successUrl = process.env.MP_SUCCESS_URL || `${baseFrontendUrl}/sucesso`;
 
@@ -154,14 +183,20 @@ router.post('/subscriptions', async (req, res) => {
     };
     const result = await preApproval.create({ body });
     // Salva assinatura no banco
-    const subscription = await Subscription.create({
-      userId: user._id,
-      mpSubscriptionId: result.id,
-      status: result.status,
+    const nextBillRaw = result.auto_recurring?.next_payment_date;
+    const nextBilling = nextBillRaw ? formatDT(nextBillRaw) : null;
+
+    const [rs] = await db.query(`INSERT INTO subscriptions (userId, mpSubscriptionId, status, planType, nextBilling)
+      VALUES (?, ?, ?, ?, ?)`, [
+      user.id,
+      result.id,
+      result.status,
       planType,
-      nextBilling: result.auto_recurring?.next_payment_date,
-    });
-    res.status(201).json(subscription);
+      nextBilling
+    ]);
+
+    const [sRows] = await db.query('SELECT * FROM subscriptions WHERE id = ?', [rs.insertId]);
+    res.status(201).json(sRows[0]);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -170,8 +205,12 @@ router.post('/subscriptions', async (req, res) => {
 // GET /subscriptions/:id: Consulta status da assinatura
 router.get('/subscriptions/:id', async (req, res) => {
   try {
-    const subscription = await Subscription.findById(req.params.id).populate('userId');
+    const [rows] = await db.query('SELECT s.*, u.email as userEmail FROM subscriptions s LEFT JOIN users u ON s.userId = u.id WHERE s.id = ?', [req.params.id]);
+    const subscription = rows[0];
     if (!subscription) return res.status(404).json({ error: 'Assinatura não encontrada' });
+    
+    // Simulate mongoose populate slightly
+    subscription.userId = { id: subscription.userId, email: subscription.userEmail };
     res.json(subscription);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -181,31 +220,20 @@ router.get('/subscriptions/:id', async (req, res) => {
 // POST /webhooks: Recebe notificações do Mercado Pago
 router.post('/webhooks', async (req, res) => {
   try {
-    // 1. Extrair os headers para validação da assinatura
     const signatureHeader = req.headers['x-signature'];
     const requestId = req.headers['x-request-id'];
 
-    // 2. O body chega como Buffer devido ao express.raw no app.cjs
     let rawBody = req.body;
     let payload = {};
 
     if (Buffer.isBuffer(rawBody)) {
       payload = JSON.parse(rawBody.toString());
     } else {
-      payload = rawBody; // Caso já venha como objeto (fallback do express.json)
+      payload = rawBody;
     }
-
-    // [Opcional/Recomendado] Validação da Assinatura:
-    // const crypto = require('crypto');
-    // const ts = signatureHeader.split(',')[0].split('=')[1];
-    // const v1 = signatureHeader.split(',')[1].split('=')[1];
-    // const manifest = `id:${payload.data.id};request-id:${requestId};ts:${ts};`;
-    // const hmac = crypto.createHmac('sha256', process.env.MP_WEBHOOK_SECRET).update(manifest).digest('hex');
-    // se hmac !== v1 -> return unauthorized
 
     console.log('[Webhook] Recebido MP Notificação:', payload.type, 'Action:', payload.action);
 
-    // Tipos de notificações (preapproval ou payment)
     if (payload.type !== 'preapproval' && payload.action !== 'payment.created' && payload.action !== 'payment.updated') {
       return res.status(200).send('ignorado');
     }
@@ -214,34 +242,43 @@ router.post('/webhooks', async (req, res) => {
       const mpSubscriptionId = payload.data && payload.data.id;
       if (!mpSubscriptionId) return res.status(400).send('id ausente');
       
-      const subscription = await Subscription.findOne({ mpSubscriptionId });
+      const [rows] = await db.query('SELECT * FROM subscriptions WHERE mpSubscriptionId = ? LIMIT 1', [mpSubscriptionId]);
+      const subscription = rows[0];
+
       if (subscription) {
         const mpResult = await preApproval.findById({ id: mpSubscriptionId });
         const newStatus = mpResult.status;
         
         if (subscription.status !== newStatus) {
-          subscription.status = newStatus;
-          subscription.nextBilling = mpResult.auto_recurring?.next_payment_date;
+          let nextBilling = subscription.nextBilling;
+          let gracePeriodUntil = subscription.gracePeriodUntil;
+
+          if (mpResult.auto_recurring?.next_payment_date) {
+            nextBilling = formatDT(mpResult.auto_recurring.next_payment_date);
+          }
+
           if (["pending", "failure"].includes(newStatus)) {
             const grace = new Date();
             grace.setDate(grace.getDate() + 3);
-            subscription.gracePeriodUntil = grace;
+            gracePeriodUntil = formatDT(grace);
           } else {
-            subscription.gracePeriodUntil = null;
+            gracePeriodUntil = null;
           }
-          subscription.updatedAt = new Date();
-          await subscription.save();
+          
+          await db.query('UPDATE subscriptions SET status = ?, nextBilling = ?, gracePeriodUntil = ? WHERE id = ?', [
+            newStatus,
+            nextBilling,
+            gracePeriodUntil,
+            subscription.id
+          ]);
         }
       }
     } else if (payload.action && payload.action.startsWith('payment')) {
-      // Aqui trataria pagamento via API normal (ex: PIX)
-      // O ID do pagamento vem em payload.data.id
       const paymentId = payload.data && payload.data.id;
       if (paymentId) {
         const result = await mpPayment.get({ id: paymentId });
         if (result?.status) {
-          db.prepare('UPDATE payments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE mp_payment_id = ?')
-            .run(result.status, paymentId);
+          await db.query('UPDATE payments SET status = ? WHERE mp_payment_id = ?', [result.status, paymentId]);
         }
       }
     }

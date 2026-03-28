@@ -6,10 +6,11 @@ const db = require('../config/database');
 const router = express.Router();
 
 // Busca pagamento por idempotency_key
-function getPaymentByIdempotencyKey(idempotencyKey) {
+async function getPaymentByIdempotencyKey(idempotencyKey) {
   if (!idempotencyKey) return null;
   try {
-    return db.prepare('SELECT * FROM payments WHERE idempotency_key = ?').get(idempotencyKey);
+    const [rows] = await db.query('SELECT * FROM payments WHERE idempotency_key = ?', [idempotencyKey]);
+    return rows[0] || null;
   } catch (err) {
     console.error('[getPaymentByIdempotencyKey] DB error:', err);
     return null;
@@ -32,20 +33,21 @@ function parseInitPoints(paymentRow) {
 }
 
 // Atualiza ou insere status do pagamento no banco
-function upsertPaymentStatus({ planType, status, amount, currency, preferenceId, paymentId, payerEmail, rawPayload }) {
+async function upsertPaymentStatus({ planType, status, amount, currency, preferenceId, paymentId, payerEmail, rawPayload }) {
   if (!preferenceId) return;
   try {
-    const existing = db.prepare('SELECT * FROM payments WHERE mp_preference_id = ?').get(preferenceId);
+    const [existingRows] = await db.query('SELECT * FROM payments WHERE mp_preference_id = ?', [preferenceId]);
+    const existing = existingRows[0];
     if (existing) {
-      db.prepare(`UPDATE payments SET status = ?, mp_payment_id = ?, payer_email = ?, raw_payload = ?, updated_at = CURRENT_TIMESTAMP WHERE mp_preference_id = ?`).run(
+      await db.query(`UPDATE payments SET status = ?, mp_payment_id = ?, payer_email = ?, raw_payload = ?, updated_at = CURRENT_TIMESTAMP WHERE mp_preference_id = ?`, [
         status,
         paymentId || existing.mp_payment_id,
         payerEmail || existing.payer_email,
         rawPayload || existing.raw_payload,
         preferenceId
-      );
+      ]);
     } else {
-      db.prepare(`INSERT INTO payments (id, plan_type, status, amount, currency, mp_preference_id, mp_payment_id, payer_email, raw_payload, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`).run(
+      await db.query(`INSERT INTO payments (id, plan_type, status, amount, currency, mp_preference_id, mp_payment_id, payer_email, raw_payload, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, [
         uuidv4(),
         planType || 'monthly',
         status || 'unknown',
@@ -55,7 +57,7 @@ function upsertPaymentStatus({ planType, status, amount, currency, preferenceId,
         paymentId || null,
         payerEmail || null,
         rawPayload || null
-      );
+      ]);
     }
   } catch (err) {
     console.error('[upsertPaymentStatus] DB error:', err);

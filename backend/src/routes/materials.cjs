@@ -6,20 +6,31 @@ const router = express.Router();
 router.use(authMiddleware);
 
 // Get all materials
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const materials = db
-      .prepare('SELECT * FROM materials WHERE tenant_id = ? ORDER BY created_at DESC')
-      .all(req.user.tenantId);
+    const [materials] = await db.query(
+      'SELECT * FROM materials WHERE tenant_id = ? ORDER BY created_at DESC',
+      [req.user.tenantId]
+    );
 
     // Parse components JSON
-    const parsedMaterials = materials.map((m) => ({
-      ...m,
-      unitWeight: m.unit_weight,
-      unitCost: m.unit_cost,
-      categoryId: m.category_id,
-      components: m.components ? JSON.parse(m.components) : [],
-    }));
+    const parsedMaterials = materials.map((m) => {
+      let components = [];
+      if (m.components) {
+        try {
+          components = typeof m.components === 'string' ? JSON.parse(m.components) : m.components;
+        } catch (e) {
+          components = [];
+        }
+      }
+      return {
+        ...m,
+        unitWeight: m.unit_weight,
+        unitCost: m.unit_cost,
+        categoryId: m.category_id,
+        components,
+      };
+    });
 
     res.json(parsedMaterials);
   } catch (error) {
@@ -29,15 +40,15 @@ router.get('/', (req, res) => {
 });
 
 // Create material
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const material = req.body;
     const id = material.id || `MAT-${Date.now()}`;
 
-    db.prepare(`
+    await db.query(`
       INSERT INTO materials (id, name, description, category_id, unit_weight, unit, unit_cost, components, tenant_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `, [
       id,
       material.name,
       material.description || '',
@@ -47,7 +58,7 @@ router.post('/', (req, res) => {
       material.unitCost,
       JSON.stringify(material.components || []),
       req.user.tenantId
-    );
+    ]);
 
     res.status(201).json({ id, ...material });
   } catch (error) {
@@ -57,17 +68,17 @@ router.post('/', (req, res) => {
 });
 
 // Update material
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const material = req.body;
 
-    db.prepare(`
+    await db.query(`
       UPDATE materials 
       SET name = ?, description = ?, category_id = ?, unit_weight = ?, unit = ?, 
           unit_cost = ?, components = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND tenant_id = ?
-    `).run(
+    `, [
       material.name,
       material.description || '',
       material.categoryId || null,
@@ -77,7 +88,7 @@ router.put('/:id', (req, res) => {
       JSON.stringify(material.components || []),
       id,
       req.user.tenantId
-    );
+    ]);
 
     res.json({ id, ...material });
   } catch (error) {
@@ -87,11 +98,11 @@ router.put('/:id', (req, res) => {
 });
 
 // Delete material
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    db.prepare('DELETE FROM materials WHERE id = ? AND tenant_id = ?').run(id, req.user.tenantId);
+    await db.query('DELETE FROM materials WHERE id = ? AND tenant_id = ?', [id, req.user.tenantId]);
 
     res.json({ success: true });
   } catch (error) {

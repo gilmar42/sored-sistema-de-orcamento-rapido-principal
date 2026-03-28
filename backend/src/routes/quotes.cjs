@@ -6,21 +6,30 @@ const router = express.Router();
 router.use(authMiddleware);
 
 // Get all quotes
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const quotes = db
-      .prepare('SELECT * FROM quotes WHERE tenant_id = ? ORDER BY date DESC')
-      .all(req.user.tenantId);
+    const [quotes] = await db.query(
+      'SELECT * FROM quotes WHERE tenant_id = ? ORDER BY date DESC',
+      [req.user.tenantId]
+    );
 
-    const parsedQuotes = quotes.map((q) => ({
-      ...q,
-      clientName: q.client_name,
-      laborCost: q.labor_cost,
-      freightCost: q.freight_cost,
-      profitMargin: q.profit_margin,
-      isFreightEnabled: Boolean(q.is_freight_enabled),
-      items: JSON.parse(q.items),
-    }));
+    const parsedQuotes = quotes.map((q) => {
+      let items = [];
+      if (q.items) {
+        try {
+           items = typeof q.items === 'string' ? JSON.parse(q.items) : q.items;
+        } catch (err) {}
+      }
+      return {
+        ...q,
+        clientName: q.client_name,
+        laborCost: q.labor_cost,
+        freightCost: q.freight_cost,
+        profitMargin: q.profit_margin,
+        isFreightEnabled: Boolean(q.is_freight_enabled),
+        items,
+      };
+    });
 
     res.json(parsedQuotes);
   } catch (error) {
@@ -30,15 +39,15 @@ router.get('/', (req, res) => {
 });
 
 // Create quote
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const quote = req.body;
     const id = quote.id || `Q-${Date.now()}`;
 
-    db.prepare(`
+    await db.query(`
       INSERT INTO quotes (id, date, client_name, items, labor_cost, freight_cost, profit_margin, is_freight_enabled, tenant_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `, [
       id,
       quote.date,
       quote.clientName,
@@ -48,7 +57,7 @@ router.post('/', (req, res) => {
       quote.profitMargin || 20,
       quote.isFreightEnabled ? 1 : 0,
       req.user.tenantId
-    );
+    ]);
 
     res.status(201).json({ id, ...quote });
   } catch (error) {
@@ -58,17 +67,17 @@ router.post('/', (req, res) => {
 });
 
 // Update quote
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const quote = req.body;
 
-    db.prepare(`
+    await db.query(`
       UPDATE quotes 
       SET date = ?, client_name = ?, items = ?, labor_cost = ?, freight_cost = ?, 
           profit_margin = ?, is_freight_enabled = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND tenant_id = ?
-    `).run(
+    `, [
       quote.date,
       quote.clientName,
       JSON.stringify(quote.items),
@@ -78,7 +87,7 @@ router.put('/:id', (req, res) => {
       quote.isFreightEnabled ? 1 : 0,
       id,
       req.user.tenantId
-    );
+    ]);
 
     res.json({ id, ...quote });
   } catch (error) {
@@ -88,10 +97,10 @@ router.put('/:id', (req, res) => {
 });
 
 // Delete quote
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    db.prepare('DELETE FROM quotes WHERE id = ? AND tenant_id = ?').run(id, req.user.tenantId);
+    await db.query('DELETE FROM quotes WHERE id = ? AND tenant_id = ?', [id, req.user.tenantId]);
     res.json({ success: true });
   } catch (error) {
     console.error('Delete quote error:', error);

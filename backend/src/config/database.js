@@ -1,123 +1,200 @@
-const Database = require('better-sqlite3');
-const path = require('path');
-const fs = require('fs');
+const mysql = require('mysql2/promise');
+const dotenv = require('dotenv');
+// Carrega as variáveis de ambiente
+dotenv.config();
 
-const dbDir = path.join(__dirname, '../../data');
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
+// Create connection pool
+const pool = mysql.createPool({
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'sored',
+  port: process.env.DB_PORT || 3306,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+});
+
+async function initDB() {
+  try {
+    const connection = await pool.getConnection();
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS tenants (
+        id VARCHAR(255) PRIMARY KEY,
+        company_name VARCHAR(255) NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(255) PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        tenant_id VARCHAR(255) NOT NULL,
+        name VARCHAR(255),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+      )
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS categories (
+        id VARCHAR(255) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        tenant_id VARCHAR(255) NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+      )
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS materials (
+        id VARCHAR(255) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        category_id VARCHAR(255),
+        unit_weight DOUBLE NOT NULL,
+        unit VARCHAR(50) NOT NULL,
+        unit_cost DOUBLE NOT NULL,
+        tenant_id VARCHAR(255) NOT NULL,
+        components JSON,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+        FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
+      )
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS clients (
+        id VARCHAR(255) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255),
+        phone VARCHAR(255),
+        address TEXT,
+        tenant_id VARCHAR(255) NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+      )
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS quotes (
+        id VARCHAR(255) PRIMARY KEY,
+        date TEXT NOT NULL,
+        client_name VARCHAR(255) NOT NULL,
+        items JSON NOT NULL,
+        labor_cost DOUBLE DEFAULT 0,
+        freight_cost DOUBLE DEFAULT 0,
+        profit_margin DOUBLE DEFAULT 20,
+        is_freight_enabled BOOLEAN DEFAULT 0,
+        tenant_id VARCHAR(255) NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+      )
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS settings (
+        id VARCHAR(255) PRIMARY KEY,
+        company_name VARCHAR(255) NOT NULL,
+        company_contact VARCHAR(255),
+        company_logo TEXT,
+        default_tax DOUBLE DEFAULT 0,
+        tenant_id VARCHAR(255) NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+      )
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS payments (
+        id VARCHAR(255) PRIMARY KEY,
+        plan_type VARCHAR(255) NOT NULL,
+        status VARCHAR(255) NOT NULL,
+        amount DOUBLE NOT NULL,
+        currency VARCHAR(10) NOT NULL,
+        mp_preference_id VARCHAR(255) UNIQUE,
+        mp_payment_id VARCHAR(255) UNIQUE,
+        payer_email VARCHAR(255),
+        idempotency_key VARCHAR(255) UNIQUE,
+        raw_payload JSON,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS refresh_tokens (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        token VARCHAR(255) NOT NULL,
+        expires_at DATETIME NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Mongoose to MySQL Migrated Tables
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS plans (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        planType VARCHAR(50) NOT NULL UNIQUE,
+        mpPlanId VARCHAR(255) NOT NULL UNIQUE,
+        price DOUBLE NOT NULL,
+        frequency INT NOT NULL,
+        frequencyType VARCHAR(50) NOT NULL,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS subscriptions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        userId VARCHAR(255) NOT NULL,
+        mpSubscriptionId VARCHAR(255) NOT NULL UNIQUE,
+        status VARCHAR(50) NOT NULL,
+        planType VARCHAR(50) NOT NULL,
+        nextBilling DATETIME,
+        gracePeriodUntil DATETIME,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    console.log('✅ MySQL Database initialized successfully');
+    connection.release();
+  } catch (error) {
+    if (error.code === 'ER_BAD_DB_ERROR') {
+      console.warn('⚠️ Banco de dados não encontrado. Criando automaticamente...');
+      try {
+        const tempPool = mysql.createPool({
+          host: process.env.DB_HOST || 'localhost',
+          user: process.env.DB_USER || 'root',
+          password: process.env.DB_PASSWORD || '',
+          port: process.env.DB_PORT || 3306,
+        });
+        const dbName = process.env.DB_NAME || 'sored';
+        await tempPool.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\``);
+        await tempPool.end();
+        console.log('✅ Banco de dados criado com sucesso. Retentando inicialização...');
+        return initDB(); // Tenta inicializar novamente
+      } catch (creationError) {
+        console.error('❌ Falha ao tentar criar o banco de dados automaticamente:', creationError);
+      }
+    } else {
+      console.error('❌ Failed to initialize database:', error.message);
+    }
+  }
 }
 
-const dbPath = path.join(dbDir, 'sored.db');
-const db = new Database(dbPath);
+// Inicializa a conexão
+initDB();
 
-// Enable foreign keys
-db.pragma('foreign_keys = ON');
-
-// Create tables
-db.exec(`
-  CREATE TABLE IF NOT EXISTS tenants (
-    id TEXT PRIMARY KEY,
-    company_name TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    tenant_id TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
-  );
-
-  CREATE TABLE IF NOT EXISTS categories (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    tenant_id TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
-  );
-
-  CREATE TABLE IF NOT EXISTS materials (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    description TEXT,
-    category_id TEXT,
-    unit_weight REAL NOT NULL,
-    unit TEXT NOT NULL,
-    unit_cost REAL NOT NULL,
-    tenant_id TEXT NOT NULL,
-    components TEXT, -- JSON string
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
-    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS clients (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    email TEXT,
-    phone TEXT,
-    address TEXT,
-    tenant_id TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
-  );
-
-  CREATE TABLE IF NOT EXISTS quotes (
-    id TEXT PRIMARY KEY,
-    date TEXT NOT NULL,
-    client_name TEXT NOT NULL,
-    items TEXT NOT NULL, -- JSON string
-    labor_cost REAL DEFAULT 0,
-    freight_cost REAL DEFAULT 0,
-    profit_margin REAL DEFAULT 20,
-    is_freight_enabled INTEGER DEFAULT 0,
-    tenant_id TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
-  );
-
-  CREATE TABLE IF NOT EXISTS settings (
-    id TEXT PRIMARY KEY,
-    company_name TEXT NOT NULL,
-    company_contact TEXT,
-    company_logo TEXT,
-    default_tax REAL DEFAULT 0,
-    tenant_id TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
-  );
-
-  CREATE TABLE IF NOT EXISTS payments (
-    id TEXT PRIMARY KEY,
-    plan_type TEXT NOT NULL,
-    status TEXT NOT NULL,
-    amount REAL NOT NULL,
-    currency TEXT NOT NULL,
-    mp_preference_id TEXT UNIQUE,
-    mp_payment_id TEXT UNIQUE,
-    payer_email TEXT,
-    idempotency_key TEXT UNIQUE,
-    raw_payload TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS refresh_tokens (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    token TEXT NOT NULL,
-    expires_at DATETIME NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-  );
-`);
-
-console.log('✅ Database initialized successfully');
-
-module.exports = db;
+module.exports = pool;

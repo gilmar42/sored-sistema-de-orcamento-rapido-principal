@@ -23,45 +23,45 @@ router.post('/signup', async (req, res) => {
     }
 
     // Check if user exists
-    const existingUser = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-    if (existingUser) {
+    const [existingUsers] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+    if (existingUsers.length > 0) {
       return res.status(400).json({ error: 'User already exists' });
     }
 
     // Create tenant
     const tenantId = `T-${Date.now()}`;
-    db.prepare('INSERT INTO tenants (id, company_name) VALUES (?, ?)').run(tenantId, companyName);
+    await db.query('INSERT INTO tenants (id, company_name) VALUES (?, ?)', [tenantId, companyName]);
 
     // Create user
     const userId = `U-${Date.now()}`;
     const passwordHash = await bcrypt.hash(password, 10);
-    db.prepare('INSERT INTO users (id, email, password_hash, tenant_id) VALUES (?, ?, ?, ?)').run(
+    await db.query('INSERT INTO users (id, email, password_hash, tenant_id) VALUES (?, ?, ?, ?)', [
       userId,
       email,
       passwordHash,
       tenantId
-    );
+    ]);
 
     // Create default category (unique id per tenant)
     const categoryId = `C-${Date.now()}`;
-    db.prepare('INSERT INTO categories (id, name, tenant_id) VALUES (?, ?, ?)').run(
+    await db.query('INSERT INTO categories (id, name, tenant_id) VALUES (?, ?, ?)', [
       categoryId,
       'Geral',
       tenantId
-    );
+    ]);
 
     // Create default settings
-    db.prepare(`
+    await db.query(`
       INSERT INTO settings (id, company_name, company_contact, company_logo, default_tax, tenant_id) 
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(
+    `, [
       `S-${Date.now()}`,
       companyName,
       '',
       '',
       0,
       tenantId
-    );
+    ]);
 
     // Send welcome email with tenant ID and user ID
     sendWelcomeEmail({
@@ -74,9 +74,10 @@ router.post('/signup', async (req, res) => {
     // Generate tokens
     const token = jwt.sign({ userId, email, tenantId }, JWT_SECRET, { expiresIn: '7d' });
     const refreshToken = generateRefreshToken();
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 dias
-    db.prepare('INSERT INTO refresh_tokens (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)')
-      .run(`RT-${Date.now()}`, userId, refreshToken, expiresAt);
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' '); // 30 dias MYSQL DATETIME format
+    await db.query('INSERT INTO refresh_tokens (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)', [
+      `RT-${Date.now()}`, userId, refreshToken, expiresAt
+    ]);
 
     res.cookie('token', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 });
     res.cookie('refreshToken', refreshToken, { httpOnly: true, sameSite: 'lax', maxAge: 30 * 24 * 60 * 60 * 1000 });
@@ -100,7 +101,8 @@ router.post('/login', async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+    const [users] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+    const user = users[0];
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -114,9 +116,10 @@ router.post('/login', async (req, res) => {
       { expiresIn: '7d' }
     );
     const refreshToken = generateRefreshToken();
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    db.prepare('INSERT INTO refresh_tokens (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)')
-      .run(`RT-${Date.now()}`, user.id, refreshToken, expiresAt);
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+    await db.query('INSERT INTO refresh_tokens (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)', [
+      `RT-${Date.now()}`, user.id, refreshToken, expiresAt
+    ]);
     res.cookie('token', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 });
     res.cookie('refreshToken', refreshToken, { httpOnly: true, sameSite: 'lax', maxAge: 30 * 24 * 60 * 60 * 1000 });
     return res.status(200).json({

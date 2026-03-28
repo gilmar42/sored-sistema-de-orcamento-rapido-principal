@@ -6,11 +6,12 @@ const router = express.Router();
 router.use(authMiddleware);
 
 // Get all categories
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const categories = db
-      .prepare('SELECT * FROM categories WHERE tenant_id = ? ORDER BY name')
-      .all(req.user.tenantId);
+    const [categories] = await db.query(
+      'SELECT * FROM categories WHERE tenant_id = ? ORDER BY name',
+      [req.user.tenantId]
+    );
 
     res.json(categories);
   } catch (error) {
@@ -20,15 +21,14 @@ router.get('/', (req, res) => {
 });
 
 // Create category
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { name } = req.body;
     const id = `CAT-${Date.now()}`;
 
-    db.prepare('INSERT INTO categories (id, name, tenant_id) VALUES (?, ?, ?)').run(
-      id,
-      name,
-      req.user.tenantId
+    await db.query(
+      'INSERT INTO categories (id, name, tenant_id) VALUES (?, ?, ?)',
+      [id, name, req.user.tenantId]
     );
 
     res.status(201).json({ id, name });
@@ -39,15 +39,14 @@ router.post('/', (req, res) => {
 });
 
 // Update category
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { name } = req.body;
 
-    db.prepare('UPDATE categories SET name = ? WHERE id = ? AND tenant_id = ?').run(
-      name,
-      id,
-      req.user.tenantId
+    await db.query(
+      'UPDATE categories SET name = ? WHERE id = ? AND tenant_id = ?',
+      [name, id, req.user.tenantId]
     );
 
     res.json({ id, name });
@@ -58,10 +57,13 @@ router.put('/:id', (req, res) => {
 });
 
 // Delete category
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    db.prepare('DELETE FROM categories WHERE id = ? AND tenant_id = ?').run(id, req.user.tenantId);
+    await db.query(
+      'DELETE FROM categories WHERE id = ? AND tenant_id = ?',
+      [id, req.user.tenantId]
+    );
     res.json({ success: true });
   } catch (error) {
     console.error('Delete category error:', error);

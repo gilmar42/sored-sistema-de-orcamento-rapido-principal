@@ -6,11 +6,13 @@ const router = express.Router();
 router.use(authMiddleware);
 
 // Get settings
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const settings = db
-      .prepare('SELECT * FROM settings WHERE tenant_id = ? LIMIT 1')
-      .get(req.user.tenantId);
+    const [rows] = await db.query(
+      'SELECT * FROM settings WHERE tenant_id = ? LIMIT 1',
+      [req.user.tenantId]
+    );
+    const settings = rows[0];
 
     if (!settings) {
       return res.json({
@@ -34,33 +36,35 @@ router.get('/', (req, res) => {
 });
 
 // Update settings
-router.put('/', (req, res) => {
+router.put('/', async (req, res) => {
   try {
     const { companyName, companyContact, companyLogo, defaultTax } = req.body;
 
     // Check if settings exist
-    const existing = db
-      .prepare('SELECT id FROM settings WHERE tenant_id = ? LIMIT 1')
-      .get(req.user.tenantId);
+    const [rows] = await db.query(
+      'SELECT id FROM settings WHERE tenant_id = ? LIMIT 1',
+      [req.user.tenantId]
+    );
+    const existing = rows[0];
 
     if (existing) {
-      db.prepare(`
+      await db.query(`
         UPDATE settings 
         SET company_name = ?, company_contact = ?, company_logo = ?, default_tax = ?, updated_at = CURRENT_TIMESTAMP
         WHERE tenant_id = ?
-      `).run(companyName, companyContact || '', companyLogo || '', defaultTax || 0, req.user.tenantId);
+      `, [companyName, companyContact || '', companyLogo || '', defaultTax || 0, req.user.tenantId]);
     } else {
-      db.prepare(`
+      await db.query(`
         INSERT INTO settings (id, company_name, company_contact, company_logo, default_tax, tenant_id)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run(
+      `, [
         `S-${Date.now()}`,
         companyName,
         companyContact || '',
         companyLogo || '',
         defaultTax || 0,
         req.user.tenantId
-      );
+      ]);
     }
 
     res.json({ companyName, companyContact, companyLogo, defaultTax });

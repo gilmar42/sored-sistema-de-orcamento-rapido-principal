@@ -10,9 +10,8 @@ const categoriesRoutes = require('./routes/categories.cjs');
 const settingsRoutes = require('./routes/settings.cjs');
 const paymentsRoutes = require('./routes/payment.cjs');
 
-// Inicializa SQLite (dados locais) e MongoDB (pagamentos SaaS)
+// Inicializa MySQL
 require('./config/database');
-require('./config/mongo')();
 
 const app = express();
 
@@ -83,7 +82,7 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`🚀 Backend server running on http://localhost:${PORT}`);
-  console.log(`📊 Database: SQLite`);
+  console.log(`📊 Database: MySQL`);
   console.log(`🔐 JWT Authentication enabled`);
 });
 
