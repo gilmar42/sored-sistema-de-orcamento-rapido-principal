@@ -62,7 +62,7 @@ app.use('/api/payments/webhooks', express.raw({ type: '*/*' }));
 app.use(express.json({ limit: '10mb' }));
 
 // Health check
-app.get('/', (req, res) => {
+app.get('/api', (req, res) => {
   res.json({ message: 'SORED API is running! 🚀' });
 });
 
