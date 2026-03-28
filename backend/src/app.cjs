@@ -10,8 +10,8 @@ const categoriesRoutes = require('./routes/categories.cjs');
 const settingsRoutes = require('./routes/settings.cjs');
 const paymentsRoutes = require('./routes/payment.cjs');
 
-// Inicializa MySQL
-require('./config/database');
+// Configurações do Banco de Dados (Lazy loading)
+const db = require('./config/database');
 
 const app = express();
 
@@ -80,30 +80,39 @@ app.get('/api', (req, res) => {
 
 app.get('/api/system-check', async (req, res) => {
   try {
-    const db = require('./config/database');
-    const [rows] = await db.query('SELECT 1');
+    const fs = require('fs');
+    const path = require('path');
+    
+    // Testa consulta simples
+    const [rows] = await db.query('SELECT 1 as alive');
+    
+    const rootFiles = fs.readdirSync(process.cwd());
+    const backendFiles = fs.existsSync(path.join(process.cwd(), 'backend')) ? fs.readdirSync(path.join(process.cwd(), 'backend')) : ['❌ Pasta backend não encontrada'];
+
     const envAudit = {
       NODE_ENV: process.env.NODE_ENV || 'not set',
+      CWD: process.cwd(),
       DB_HOST: process.env.DB_HOST ? '✅ Configurado' : '❌ FALTANDO',
       DB_USER: process.env.DB_USER || '❌ FALTANDO',
       DB_NAME: process.env.DB_NAME || '❌ FALTANDO',
-      MP_ACCESS_TOKEN: process.env.MP_ACCESS_TOKEN ? '✅ Configurado (Comprimento: ' + process.env.MP_ACCESS_TOKEN.length + ')' : '❌ FALTANDO',
-      JWT_SECRET: process.env.JWT_SECRET ? '✅ Configurado' : '❌ FALTANDO',
-      PORT: process.env.PORT || '9000 (default)',
+      MP_ACCESS_TOKEN: process.env.MP_ACCESS_TOKEN ? '✅ Configurado' : '❌ FALTANDO',
+      ROOT_FILES: rootFiles.filter(f => !f.startsWith('.')),
+      BACKEND_FILES: backendFiles.filter(f => !f.startsWith('.')),
     };
 
     res.json({
       status: 'UP',
       database: '✅ CONECTADO',
-      environment: envAudit,
+      context: envAudit,
       timestamp: new Date().toISOString()
     });
   } catch (err) {
     res.status(500).json({
       status: 'DOWN',
-      database: '❌ ERRO DE CONEXÃO: ' + err.message,
-      environment_keys_present: Object.keys(process.env).filter(k => k.includes('DB_') || k.includes('MP_') || k.includes('JWT')),
-      error: err.stack
+      database: '❌ ERRO: ' + err.message,
+      cwd: process.cwd(),
+      error: err.stack,
+      hint: 'O sistema não conseguiu conectar ao banco. Verifique as credenciais no .env.'
     });
   }
 });

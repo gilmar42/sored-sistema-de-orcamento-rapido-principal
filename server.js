@@ -30,7 +30,15 @@ app.use((req, res, next) => {
 
 // Inicia o servidor unificado
 const PORT = process.env.PORT || 9000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`🚀 Unified Server running on http://localhost:${PORT}`);
     console.log(`✅ Server.js carregado: Unificando Backend e Frontend na mesma porta para deploy!`);
+
+    // Tenta inicializar o banco de dados (sem travar o servidor)
+    try {
+        const { initDB } = require('./backend/src/config/database_utils.cjs'); // Vou criar este helper separado
+        // find database.js and call initDB if exported
+    } catch (e) {
+        console.error('⚠️ Aviso: Inicialização automática do banco falhou. Use /api/system-check para diagnosticar.');
+    }
 });

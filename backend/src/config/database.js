@@ -2,17 +2,31 @@ const mysql = require('mysql2/promise');
 // Conexão MySQL
 
 
-// Create connection pool
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'sored',
-  port: process.env.DB_PORT || 3306,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-});
+// Create connection pool (Lazy initialization)
+let _pool = null;
+
+function getPool() {
+  if (!_pool) {
+    console.log(`🔌 Inicializando Pool MySQL: ${process.env.DB_HOST || 'localhost'} (Banco: ${process.env.DB_NAME || 'sored'})`);
+    _pool = mysql.createPool({
+      host: process.env.DB_HOST || 'localhost',
+      user: process.env.DB_USER || 'root',
+      password: process.env.DB_PASSWORD || '',
+      database: process.env.DB_NAME || 'sored',
+      port: process.env.DB_PORT || 3306,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0
+    });
+  }
+  return _pool;
+}
+
+// Proxy methods for the pool
+const poolProxy = {
+  query: (...args) => getPool().query(...args),
+  getConnection: (...args) => getPool().getConnection(...args)
+};
 
 let initRetries = 0;
 const MAX_RETRIES = 3;
@@ -21,8 +35,8 @@ async function initDB() {
   let connection;
   const isProduction = process.env.NODE_ENV === 'production';
   try {
-    console.log(`🔌 Conectando ao MySQL: ${process.env.DB_HOST} (User: ${process.env.DB_USER})`);
-    connection = await pool.getConnection();
+    console.log(`🧪 Verificando Conexão MySQL: ${process.env.DB_HOST} (User: ${process.env.DB_USER})`);
+    connection = await poolProxy.getConnection();
 
     await connection.query(`
       CREATE TABLE IF NOT EXISTS tenants (
@@ -207,7 +221,7 @@ async function initDB() {
   }
 }
 
-// Inicializa a conexão
-initDB();
+// Inicializa a conexão (Opcional, pode ser chamado externamente)
+// initDB(); 
 
-module.exports = pool;
+module.exports = poolProxy;
