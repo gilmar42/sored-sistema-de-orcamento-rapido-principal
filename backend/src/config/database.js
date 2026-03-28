@@ -172,7 +172,7 @@ async function initDB() {
     connection.release();
   } catch (error) {
     if (error.code === 'ER_BAD_DB_ERROR') {
-      console.warn('⚠️ Banco de dados não encontrado. Criando automaticamente...');
+      console.warn('⚠️ Database not found. Attempting automatic creation...');
       try {
         const tempPool = mysql.createPool({
           host: process.env.DB_HOST || 'localhost',
@@ -183,13 +183,20 @@ async function initDB() {
         const dbName = process.env.DB_NAME || 'sored';
         await tempPool.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\``);
         await tempPool.end();
-        console.log('✅ Banco de dados criado com sucesso. Retentando inicialização...');
-        return initDB(); // Tenta inicializar novamente
+        console.log('✅ Database created successfully. Retrying initialization...');
+        return initDB();
       } catch (creationError) {
-        console.error('❌ Falha ao tentar criar o banco de dados automaticamente:', creationError);
+        console.error('❌ Failed to create database automatically:', creationError.message);
+        console.error('Check your DB_USER permissions and Hostinger DB settings.');
       }
     } else {
-      console.error('❌ Failed to initialize database:', error.message);
+      console.error('❌ Database Initialization Error:');
+      console.error('Code:', error.code);
+      console.error('Message:', error.message);
+      console.error('DB_HOST:', process.env.DB_HOST);
+      console.error('DB_USER:', process.env.DB_USER);
+      console.error('DB_PORT:', process.env.DB_PORT);
+      console.error('Check if MySQL is running and accessible from the production server.');
     }
   }
 }
