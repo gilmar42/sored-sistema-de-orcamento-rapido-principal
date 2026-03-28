@@ -59,6 +59,26 @@ function formatDT(d) {
   return dt.toISOString().slice(0, 19).replace('T', ' ');
 }
 
+// GET /plans: Retorna os planos existentes no banco
+router.get('/plans', async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT * FROM plans');
+    const plans = rows.reduce((acc, p) => {
+      acc[p.planType] = p;
+      return acc;
+    }, {});
+    
+    // Converte para o formato esperado pelo frontend (monthlyPlan, annualPlan)
+    res.json({ 
+      monthlyPlan: plans.monthly || null, 
+      annualPlan: plans.annual || null 
+    });
+  } catch (error) {
+    console.error('❌ [GET Plans Error]:', error.message);
+    res.status(500).json({ error: 'Erro ao buscar planos', details: error.message });
+  }
+});
+
 // POST /plans: Cria planos mensal e anual
 router.post('/plans', async (req, res) => {
   try {

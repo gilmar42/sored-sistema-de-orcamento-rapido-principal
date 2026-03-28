@@ -43,11 +43,24 @@ app.use((req, res, next) => {
 });
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      // Permite qualquer localhost ou 127.0.0.1 em desenvolvimento, ou as origens permitidas
+      const isLocal = origin && (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1'));
+      if (!origin || isLocal || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.warn('⚠️ CORS Blocked for origin:', origin);
+        callback(null, false); // Não permitir, mas não lançar erro 500
+      }
+    },
     credentials: true,
-    optionsSuccessStatus: 200, // Garante que preflight responde 200
+    optionsSuccessStatus: 200,
   })
 );
+
+// CORS is handled by the middleware above
+
+
 
 // Handler global para preflight OPTIONS (CORS)
 
