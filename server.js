@@ -7,8 +7,8 @@ const app = require('./backend/src/app.cjs');
 
 // Configura o servidor Express (que já está rodando a API) para TAMBÉM servir o Frontend
 
-// O Output Directory definido para a Hostinger é a pasta 'dist' gerada pelo Vite
-const distPath = path.join(__dirname, 'dist');
+// O Output Directory definido para a Hostinger é a pasta 'dist' gerada pelo Vite dentro do frontend
+const distPath = path.join(__dirname, 'frontend', 'dist');
 
 // Serve os arquivos estáticos
 app.use(express.static(distPath));
