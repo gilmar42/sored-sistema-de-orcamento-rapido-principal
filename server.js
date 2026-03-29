@@ -41,10 +41,22 @@ app.get('/api/system-check', async (req, res) => {
             timestamp: new Date().toISOString()
         });
     } catch (err) {
+        let rootFiles = [];
+        let backendFiles = [];
+        try { rootFiles = fs.readdirSync(process.cwd()); } catch (e) {}
+        try { backendFiles = fs.readdirSync(path.join(process.cwd(), 'backend')); } catch (e) {}
+
         res.status(500).json({
             status: 'DOWN',
             database: '❌ ERRO: ' + err.message,
             cwd: process.cwd(),
+            root_files: rootFiles,
+            backend_files: backendFiles,
+            env_loaded: {
+                DB_USER: process.env.DB_USER,
+                ROOT_ENV: fs.existsSync(path.join(process.cwd(), '.env')),
+                BACKEND_ENV: fs.existsSync(path.join(process.cwd(), 'backend', '.env')),
+            },
             hint: 'O servidor não conseguiu conectar ao banco. Verifique o seu .env'
         });
     }
