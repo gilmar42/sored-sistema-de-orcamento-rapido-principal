@@ -1,4 +1,9 @@
-require('dotenv').config({ path: require('path').resolve(__dirname, 'backend', '.env') });
+const path = require('path');
+const dotenv = require('dotenv');
+
+// Carrega .env da Raiz ou da pasta Backend (para garantir que a senha seja lida)
+dotenv.config(); // Primeiro tenta a raiz
+dotenv.config({ path: path.resolve(__dirname, 'backend', '.env') }); // Depois tenta a pasta backend
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
