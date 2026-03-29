@@ -56,8 +56,9 @@ app.get('/api/system-check', async (req, res) => {
                 DB_USER: process.env.DB_USER,
                 ROOT_ENV: fs.existsSync(path.join(process.cwd(), '.env')),
                 BACKEND_ENV: fs.existsSync(path.join(process.cwd(), 'backend', '.env')),
+                AVAILABLE_KEYS: Object.keys(process.env).filter(key => key.startsWith('DB_') || key.startsWith('JWT_') || key.startsWith('MP_'))
             },
-            hint: 'O servidor não conseguiu conectar ao banco. Verifique o seu .env'
+            hint: 'O servidor está lendo o .env mas a SENHA continua vazia. Verifique se o nome no arquivo .env é exatamente DB_PASSWORD.'
         });
     }
 });
