@@ -1,5 +1,11 @@
 const mysql = require('mysql2/promise');
-// Conexão MySQL
+const path = require('path');
+const dotenv = require('dotenv');
+
+// Garante que o .env seja lido mesmo se o server.js falhar
+dotenv.config(); // Raiz do CWD
+dotenv.config({ path: path.resolve(__dirname, '..', '..', '.env') }); // ../../.env (raiz do backend)
+dotenv.config({ path: path.resolve(__dirname, '..', '.env') }); // ../.env (dentro de src ou backend)
 
 
 // Create connection pool (Lazy initialization)
