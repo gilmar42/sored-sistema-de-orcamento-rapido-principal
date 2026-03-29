@@ -29,6 +29,28 @@ app.get('/api/check-in', (req, res) => {
     });
 });
 
+// Consigo checar o sistema inteiro aqui também
+app.get('/api/system-check', async (req, res) => {
+    try {
+        const db = require('./backend/src/config/database');
+        const [rows] = await db.query('SELECT 1 as alive');
+        
+        res.json({
+            status: 'UP',
+            database: '✅ CONECTADO',
+            cwd: process.cwd(),
+            timestamp: new Date().toISOString()
+        });
+    } catch (err) {
+        res.status(500).json({
+            status: 'DOWN',
+            database: '❌ ERRO: ' + err.message,
+            cwd: process.cwd(),
+            hint: 'O servidor não conseguiu conectar ao banco. Verifique o seu .env'
+        });
+    }
+});
+
 // Manda tudo que não for requisição da API para o Roteador do React (index.html)
 app.use((req, res, next) => {
     if (req.url.startsWith('/api')) {
