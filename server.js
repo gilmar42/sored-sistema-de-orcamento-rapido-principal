@@ -90,9 +90,15 @@ app.listen(PORT, async () => {
 
     // Tenta inicializar o banco de dados (sem travar o servidor)
     try {
-        const { initDB } = require('./backend/src/config/database_utils.cjs'); // Vou criar este helper separado
-        // find database.js and call initDB if exported
+        const db = require('./backend/src/config/database');
+        // Chamamos a inicialização que criará as tabelas se não existirem
+        const { initDB } = require('./backend/src/config/database_utils.cjs'); // Verifiquei que este arquivo existe
+        if (typeof initDB === 'function') {
+            await initDB();
+            console.log('✅ Tabelas do Banco de Dados verificadas/criadas.');
+        }
     } catch (e) {
         console.error('⚠️ Aviso: Inicialização automática do banco falhou. Use /api/system-check para diagnosticar.');
+        console.error(e.message);
     }
 });
