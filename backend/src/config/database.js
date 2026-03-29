@@ -13,12 +13,18 @@ let _pool = null;
 
 function getPool() {
   if (!_pool) {
-    console.log(`🔌 Inicializando Pool MySQL: ${process.env.DB_HOST || 'localhost'} (Banco: ${process.env.DB_NAME || 'sored'})`);
+    const dbHost = process.env.DB_HOST || process.env.DATABASE_HOST || '127.0.0.1';
+    const dbUser = process.env.DB_USER || process.env.DATABASE_USER || 'root';
+    const dbPass = process.env.DB_PASSWORD || process.env.DB_PASS || process.env.DATABASE_PASSWORD || '';
+    const dbName = process.env.DB_NAME || process.env.DATABASE_NAME || 'sored';
+
+    console.log(`🔌 Inicializando Pool MySQL: ${dbHost} (User: ${dbUser}, Banco: ${dbName})`);
+    
     _pool = mysql.createPool({
-      host: process.env.DB_HOST || 'localhost',
-      user: process.env.DB_USER || 'root',
-      password: process.env.DB_PASSWORD || '',
-      database: process.env.DB_NAME || 'sored',
+      host: dbHost,
+      user: dbUser,
+      password: dbPass,
+      database: dbName,
       port: process.env.DB_PORT || 3306,
       waitForConnections: true,
       connectionLimit: 10,
