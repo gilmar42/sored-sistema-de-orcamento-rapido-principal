@@ -66,9 +66,10 @@ app.use(
 
 const PORT = process.env.PORT || 9000;
 
+const cookieParser = require('cookie-parser');
+
 // Middleware
-
-
+app.use(cookieParser()); // Necessário para ler cookies de token
 // Webhook precisa receber raw body para validação de assinatura (se necessário)
 app.use('/api/payments/webhooks', express.raw({ type: '*/*' }));
 app.use(express.json({ limit: '10mb' }));
