@@ -79,44 +79,7 @@ app.get('/api', (req, res) => {
   res.json({ message: 'SORED API is running! 🚀' });
 });
 
-app.get('/api/system-check', async (req, res) => {
-  try {
-    const fs = require('fs');
-    const path = require('path');
-    
-    // Testa consulta simples
-    const [rows] = await db.query('SELECT 1 as alive');
-    
-    const rootFiles = fs.readdirSync(process.cwd());
-    const backendFiles = fs.existsSync(path.join(process.cwd(), 'backend')) ? fs.readdirSync(path.join(process.cwd(), 'backend')) : ['❌ Pasta backend não encontrada'];
-
-    const envAudit = {
-      NODE_ENV: process.env.NODE_ENV || 'not set',
-      CWD: process.cwd(),
-      DB_HOST: process.env.DB_HOST ? '✅ Configurado' : '❌ FALTANDO',
-      DB_USER: process.env.DB_USER || '❌ FALTANDO',
-      DB_NAME: process.env.DB_NAME || '❌ FALTANDO',
-      MP_ACCESS_TOKEN: process.env.MP_ACCESS_TOKEN ? '✅ Configurado' : '❌ FALTANDO',
-      ROOT_FILES: rootFiles.filter(f => !f.startsWith('.')),
-      BACKEND_FILES: backendFiles.filter(f => !f.startsWith('.')),
-    };
-
-    res.json({
-      status: 'UP',
-      database: '✅ CONECTADO',
-      context: envAudit,
-      timestamp: new Date().toISOString()
-    });
-  } catch (err) {
-    res.status(500).json({
-      status: 'DOWN',
-      database: '❌ ERRO: ' + err.message,
-      cwd: process.cwd(),
-      error: err.stack,
-      hint: 'O sistema não conseguiu conectar ao banco. Verifique as credenciais no .env.'
-    });
-  }
-});
+// A rota /api/system-check foi movida para o server.js para evitar conflitos de rota.
 
 // Routes
 app.use('/api/auth', authRoutes);
