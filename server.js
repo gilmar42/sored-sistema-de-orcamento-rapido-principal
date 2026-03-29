@@ -5,7 +5,6 @@ const dotenv = require('dotenv');
 dotenv.config(); // Primeiro tenta a raiz
 dotenv.config({ path: path.resolve(__dirname, 'backend', '.env') }); // Depois tenta a pasta backend
 const express = require('express');
-const path = require('path');
 const fs = require('fs');
 
 // Importa e inicializa imediatamente a API (Backend)
