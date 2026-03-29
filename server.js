@@ -56,9 +56,14 @@ app.get('/api/system-check', async (req, res) => {
                 DB_USER: process.env.DB_USER,
                 ROOT_ENV: fs.existsSync(path.join(process.cwd(), '.env')),
                 BACKEND_ENV: fs.existsSync(path.join(process.cwd(), 'backend', '.env')),
-                AVAILABLE_KEYS: Object.keys(process.env).filter(key => key.startsWith('DB_') || key.startsWith('JWT_') || key.startsWith('MP_'))
+                AVAILABLE_KEYS: Object.keys(process.env).filter(key => key.startsWith('DB_') || key.startsWith('JWT_') || key.startsWith('MP_')),
+                PASS_AUDIT: process.env.DB_PASSWORD || process.env.DB_PASS ? {
+                    length: (process.env.DB_PASSWORD || process.env.DB_PASS).length,
+                    first: (process.env.DB_PASSWORD || process.env.DB_PASS)[0],
+                    last: (process.env.DB_PASSWORD || process.env.DB_PASS).slice(-1)
+                } : 'MISSING'
             },
-            hint: 'O servidor está lendo o .env mas a SENHA continua vazia. Verifique se o nome no arquivo .env é exatamente DB_PASSWORD.'
+            hint: 'O banco REJEITOU a senha. Verifique se você incluiu espaços ou aspas (ex: "senha") no seu .env por engano.'
         });
     }
 });
