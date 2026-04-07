@@ -21,7 +21,7 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ open, onClose, pr
     docType: 'CPF',
     docNumber: '',
   });
-  const mpKey = typeof process !== 'undefined' ? process.env?.VITE_MP_PUBLIC_KEY || '' : '';
+  const mpKey = typeof process !== 'undefined' ? process.env.VITE_MP_PUBLIC_KEY || '' : '';
   const mp = useMercadoPago(mpKey);
   const formRef = useRef<HTMLFormElement>(null);
   const [loading, setLoading] = useState(false);

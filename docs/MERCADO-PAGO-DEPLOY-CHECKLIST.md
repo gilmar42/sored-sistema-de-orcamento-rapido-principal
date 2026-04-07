@@ -20,7 +20,11 @@ MP_ACCESS_TOKEN=APP_USR-<valor>          # ✅ PRODUÇÃO
 MERCADO_PAGO_PUBLIC_KEY=APP_USR-<valor>  # ✅ PRODUÇÃO
 MERCADO_PAGO_WEBHOOK_SECRET=<valor>      # ✅ PRODUÇÃO
 FRONTEND_URL_PRODUCTION=https://...      # ✅
-MONGODB_URI=mongodb+srv://...            # ✅ PRODUÇÃO
+DB_HOST=...                              # ✅ PRODUÇÃO
+DB_USER=...                              # ✅ PRODUÇÃO
+DB_PASSWORD=...                          # ✅ PRODUÇÃO
+DB_NAME=sored                            # ✅ PRODUÇÃO
+DB_PORT=3306                             # ✅ PRODUÇÃO
 ```
 
 **Validar**:
@@ -44,13 +48,13 @@ MONGODB_URI=mongodb+srv://...            # ✅ PRODUÇÃO
   - [ ] `Content-Security-Policy` restritiva
 
 #### Banco de Dados
-- [ ] MongoDB em produção configurado
+- [ ] MySQL em produção configurado
   - [ ] com autenticação
   - [ ] sem acesso público na internet
   - [ ] backups automáticos habilitados
-- [ ] SQLite para pagamentos intacto
+- [ ] Tabelas de pagamento intactas
 - [ ] `payments` table criada
-- [ ] `subscriptions` collection criada
+- [ ] `subscriptions` table criada
 
 #### Logs
 - [ ] Logs configurados para arquivo ou serviço centralizado
@@ -234,16 +238,16 @@ curl https://seu-backend.com/api/health
 # Reconfigure webhook no painel MP
 ```
 
-### "Erro ao conectar MongoDB"
-**Causa**: String de conexão inválida ou servidor inacessível
+### "Erro ao conectar MySQL"
+**Causa**: Credenciais inválidas ou servidor inacessível
 **Solução**:
 ```bash
 # Teste conexão localmente
-mongo "seu-mongodb-uri"
+mysql -h seu-host-mysql -u seu-usuario -p sored
 
 # Verifique:
 # - Username/password corretos
-# - IP whitelist (MongoDB Atlas)
+# - Firewall/IP whitelist do provedor MySQL
 # - Nome do database correto
 ```
 

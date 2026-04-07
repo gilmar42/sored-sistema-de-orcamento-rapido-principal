@@ -1,5 +1,5 @@
 
-const RAW_BASE = typeof process !== 'undefined' ? process.env?.VITE_API_URL : undefined;
+const RAW_BASE = typeof process !== 'undefined' ? process.env.VITE_API_URL : undefined;
 const API_URL = RAW_BASE ? (RAW_BASE.endsWith('/api') ? RAW_BASE : `${RAW_BASE}/api`) : '/api';
 
 class ApiService {

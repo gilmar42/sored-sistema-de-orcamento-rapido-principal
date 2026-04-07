@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const RAW_BASE = typeof process !== 'undefined' ? process.env?.VITE_API_URL : undefined;
+const RAW_BASE = typeof process !== 'undefined' ? process.env.VITE_API_URL : undefined;
 const API_BASE = RAW_BASE ? (RAW_BASE.endsWith('/api') ? RAW_BASE : `${RAW_BASE}/api`) : '/api';
 const API = API_BASE.endsWith('/payments') ? API_BASE : `${API_BASE}/payments`;
 

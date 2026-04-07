@@ -1,8 +1,10 @@
-# 🚀 Mercado Pago em Produção - Roadmap Completo
+# 🚀 Mercado Pago em Produção - Roteiro Completo
 
 **Data de Criação**: 3 de Fevereiro de 2026  
 **Status**: ✅ Pronto para Implementação  
 **Estimado**: 4-6 horas para setup completo
+
+Este roteiro organiza, em ordem prática, os guias e passos para levar o Mercado Pago para produção sem ruído.
 
 ---
 
@@ -10,7 +12,7 @@
 
 Toda a documentação necessária está organizada em 5 documentos principais:
 
-### 1. **Quick Start** (LEIA PRIMEIRO)
+### 1. **Guia Rápido** (LEIA PRIMEIRO)
 📄 [MERCADO-PAGO-QUICK-START.md](MERCADO-PAGO-QUICK-START.md)  
 ⏱️ 30 minutos  
 📋 8 passos essenciais  
@@ -25,7 +27,7 @@ Toda a documentação necessária está organizada em 5 documentos principais:
 
 ---
 
-### 2. **Setup Detalhado** (LEIA DEPOIS)
+### 2. **Guia Completo** (LEIA DEPOIS)
 📄 [MERCADO-PAGO-PRODUCTION-SETUP.md](MERCADO-PAGO-PRODUCTION-SETUP.md)  
 ⏱️ 2-3 horas  
 📋 12 seções completas  
@@ -41,7 +43,7 @@ Toda a documentação necessária está organizada em 5 documentos principais:
 
 ---
 
-### 3. **Deploy Checklist**
+### 3. **Checklist de Deploy**
 📄 [MERCADO-PAGO-DEPLOY-CHECKLIST.md](MERCADO-PAGO-DEPLOY-CHECKLIST.md)  
 ⏱️ Referência rápida  
 📋 40+ itens verificáveis  
@@ -57,7 +59,7 @@ Toda a documentação necessária está organizada em 5 documentos principais:
 
 ---
 
-### 4. **Segurança**
+### 4. **Guia de Segurança**
 📄 [MERCADO-PAGO-SECURITY.md](MERCADO-PAGO-SECURITY.md)  
 ⏱️ 1-2 horas  
 📋 10 áreas de segurança  
@@ -75,7 +77,7 @@ Toda a documentação necessária está organizada em 5 documentos principais:
 
 ---
 
-### 5. **Testes e Validação**
+### 5. **Guia de Testes**
 📄 [MERCADO-PAGO-TESTING.md](MERCADO-PAGO-TESTING.md)  
 ⏱️ 1-2 horas  
 📋 Testes em múltiplas camadas  
@@ -100,8 +102,8 @@ Toda a documentação necessária está organizada em 5 documentos principais:
 ⏱️ Tempo: 1-2 horas
 ```
 
-- [ ] Ler [Quick Start](MERCADO-PAGO-QUICK-START.md)
-- [ ] Ler [Setup Detalhado](MERCADO-PAGO-PRODUCTION-SETUP.md) - seção 1-3
+- [ ] Ler [Guia Rápido](MERCADO-PAGO-QUICK-START.md)
+- [ ] Ler [Guia Completo](MERCADO-PAGO-PRODUCTION-SETUP.md) - seção 1-3
 - [ ] Obter credenciais do Mercado Pago (PRODUÇÃO)
 - [ ] Verificar pré-requisitos (HTTPS, domínio, DNS)
 
@@ -117,7 +119,7 @@ Toda a documentação necessária está organizada em 5 documentos principais:
 
 - [ ] Configurar `backend/.env` com credenciais
 - [ ] Configurar `frontend/.env` com PUBLIC_KEY
-- [ ] Ler [Security Guide](MERCADO-PAGO-SECURITY.md) - seção 1-3
+- [ ] Ler [Guia de Segurança](MERCADO-PAGO-SECURITY.md) - seção 1-3
 - [ ] Aplicar security practices no código
 - [ ] Rodar testes locais: `npm test`
 
@@ -131,7 +133,7 @@ Toda a documentação necessária está organizada em 5 documentos principais:
 ⏱️ Tempo: 1-2 horas
 ```
 
-- [ ] Ler [Testing Guide](MERCADO-PAGO-TESTING.md) - seção 1-3
+- [ ] Ler [Guia de Testes](MERCADO-PAGO-TESTING.md) - seção 1-3
 - [ ] Executar testes unitários
 - [ ] Executar testes integração
 - [ ] Testar fluxo completo com cartão de teste
@@ -148,7 +150,7 @@ Toda a documentação necessária está organizada em 5 documentos principais:
 ⏱️ Tempo: 1-2 horas
 ```
 
-- [ ] Ler [Setup Detalhado](MERCADO-PAGO-PRODUCTION-SETUP.md) - seção 7-8
+- [ ] Ler [Guia Completo](MERCADO-PAGO-PRODUCTION-SETUP.md) - seção 7-8
 - [ ] Deploy do backend em staging
 - [ ] Deploy do frontend em staging
 - [ ] Configurar webhook em staging
@@ -165,7 +167,7 @@ Toda a documentação necessária está organizada em 5 documentos principais:
 ⏱️ Tempo: 30 minutos a 1 hora
 ```
 
-- [ ] Ler [Deploy Checklist](MERCADO-PAGO-DEPLOY-CHECKLIST.md)
+- [ ] Ler [Checklist de Deploy](MERCADO-PAGO-DEPLOY-CHECKLIST.md)
 - [ ] Verificar todos os itens do checklist
 - [ ] Fazer backup de database
 - [ ] Deploy do backend em produção
@@ -183,8 +185,8 @@ Toda a documentação necessária está organizada em 5 documentos principais:
 ⏱️ Tempo: Setup 30min, monitoramento contínuo
 ```
 
-- [ ] Ler [Security Guide](MERCADO-PAGO-SECURITY.md) - seção 10
-- [ ] Ler [Testing Guide](MERCADO-PAGO-TESTING.md) - seção 7
+- [ ] Ler [Guia de Segurança](MERCADO-PAGO-SECURITY.md) - seção 10
+- [ ] Ler [Guia de Testes](MERCADO-PAGO-TESTING.md) - seção 7
 - [ ] Configurar alertas (Sentry, LogRocket)
 - [ ] Configurar uptime monitor
 - [ ] Monitorar webhooks
@@ -213,9 +215,9 @@ Toda a documentação necessária está organizada em 5 documentos principais:
 
 ```mermaid
 graph TD
-    A["1. Quick Start<br/>(30 min)"] --> B["2. Setup Detalhado<br/>(2-3h)"]
-    B --> C["3. Security<br/>(1-2h)"]
-    C --> D["4. Testes Sandbox<br/>(1-2h)"]
+    A["1. Guia Rápido<br/>(30 min)"] --> B["2. Guia Completo<br/>(2-3h)"]
+    B --> C["3. Guia de Segurança<br/>(1-2h)"]
+    C --> D["4. Guia de Testes<br/>(1-2h)"]
     D --> E["5. Deploy Staging<br/>(1-2h)"]
     E --> F["6. Deploy Produção<br/>(30min-1h)"]
     F --> G["7. Monitoramento<br/>(Contínuo)"]
@@ -237,7 +239,7 @@ graph TD
 - [ ] Minha conta está verificada (KYC completo)
 - [ ] Tenho domínio com HTTPS configurado
 - [ ] Backend será deployado em servidor HTTPS acessível publicamente
-- [ ] Tenho acesso a MongoDB em produção (Atlas ou self-hosted)
+- [ ] Tenho acesso ao MySQL em produção
 - [ ] Tenho acesso a plataforma de deploy (Hostinger, Render, AWS, etc)
 - [ ] O projeto já passa em `npm test` e `npm run build`
 - [ ] Tenho `.env` no `.gitignore` (não commitou credenciais)
@@ -250,7 +252,7 @@ graph TD
 
 ### P1: Por onde começo?
 
-**R**: Comece pelo [Quick Start](MERCADO-PAGO-QUICK-START.md). Se tiver dúvidas, consulte o [Setup Detalhado](MERCADO-PAGO-PRODUCTION-SETUP.md).
+**R**: Comece pelo [Guia Rápido](MERCADO-PAGO-QUICK-START.md). Se tiver dúvidas, consulte o [Guia Completo](MERCADO-PAGO-PRODUCTION-SETUP.md).
 
 ---
 
@@ -263,8 +265,8 @@ graph TD
 ### P3: E se algo der errado?
 
 **R**: Verifique:
-1. [Deploy Checklist](MERCADO-PAGO-DEPLOY-CHECKLIST.md) - Troubleshooting
-2. [Quick Start](MERCADO-PAGO-QUICK-START.md) - Troubleshooting
+1. [Checklist de Deploy](MERCADO-PAGO-DEPLOY-CHECKLIST.md) - Troubleshooting
+2. [Guia Rápido](MERCADO-PAGO-QUICK-START.md) - Troubleshooting
 3. Logs do servidor e painel Mercado Pago
 
 ---
@@ -371,7 +373,7 @@ Deploy será considerado **bem-sucedido** quando:
 ## 🚀 Próximos Passos
 
 **Imediato (Hoje)**:
-1. Leia [Quick Start](MERCADO-PAGO-QUICK-START.md)
+1. Leia [Guia Rápido](MERCADO-PAGO-QUICK-START.md)
 2. Obtenha credenciais do Mercado Pago
 3. Configure `.env` local
 
@@ -392,8 +394,8 @@ Deploy será considerado **bem-sucedido** quando:
 Se encontrar problemas:
 
 1. **Verifique a documentação**:
-   - [Troubleshooting no Quick Start](MERCADO-PAGO-QUICK-START.md#troubleshooting)
-   - [Troubleshooting no Deploy Checklist](MERCADO-PAGO-DEPLOY-CHECKLIST.md#problemas-comuns-e-soluções)
+   - [Troubleshooting no Guia Rápido](MERCADO-PAGO-QUICK-START.md#troubleshooting)
+   - [Troubleshooting no Checklist de Deploy](MERCADO-PAGO-DEPLOY-CHECKLIST.md#problemas-comuns-e-soluções)
 
 2. **Consulte recursos**:
    - [Oficial Mercado Pago](https://help.mercadopago.com.br)
@@ -425,5 +427,4 @@ Pronto para Produção:  ✅ SIM
 
 ---
 
-> 🎯 **Lembre-se**: Comece pelo [Quick Start](MERCADO-PAGO-QUICK-START.md)! Demore apenas 30 minutos.
-
+> 🎯 **Lembre-se**: Comece pelo [Guia Rápido](MERCADO-PAGO-QUICK-START.md)! Demore apenas 30 minutos.

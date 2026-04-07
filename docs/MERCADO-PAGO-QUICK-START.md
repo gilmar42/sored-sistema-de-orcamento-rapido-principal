@@ -1,4 +1,4 @@
-# Mercado Pago - Quick Start Produção
+# Mercado Pago - Guia Rápido para Produção
 
 Guia rápido para colocar Mercado Pago em produção em 30 minutos.
 
@@ -42,14 +42,22 @@ nano backend/.env
 ```
 
 ```dotenv
-# Mude essas variáveis para PRODUÇÃO:
+# Backend em produção:
 NODE_ENV=production
+PORT=5000
 MP_ACCESS_TOKEN=APP_USR-seu-access-token
+MERCADO_PAGO_ACCESS_TOKEN=APP_USR-seu-access-token
 MERCADO_PAGO_PUBLIC_KEY=APP_USR-sua-public-key
 MERCADO_PAGO_WEBHOOK_SECRET=seu-webhook-secret
 JWT_SECRET=sua-chave-super-secreta-mude-isso
+FRONTEND_URL=http://localhost:5173
 FRONTEND_URL_PRODUCTION=https://seu-dominio.com
-MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/sored
+DB_HOST=seu-host-mysql
+DB_USER=seu-usuario
+DB_PASSWORD=sua-senha
+DB_NAME=sored
+DB_PORT=3306
+CURRENCY=BRL
 ```
 
 ### 2.2 Validar
@@ -75,6 +83,7 @@ nano frontend/.env
 ```
 
 ```dotenv
+# Frontend em produção:
 VITE_API_URL=https://seu-backend-url.com/api
 VITE_MP_PUBLIC_KEY=APP_USR-sua-public-key
 VITE_FRONTEND_URL=https://seu-dominio.com
@@ -117,7 +126,7 @@ npm run build
 
 # 2. Configure variáveis de ambiente no painel da hospedagem:
 
-#    Adicione: MP_ACCESS_TOKEN, MERCADO_PAGO_PUBLIC_KEY, etc
+#    Adicione: MP_ACCESS_TOKEN, MERCADO_PAGO_PUBLIC_KEY, FRONTEND_URL_PRODUCTION, etc
 ```
 
 ### Opção B: Render.com
@@ -237,13 +246,14 @@ curl https://seu-backend.com/api/health
 ### Erro: "Database connection failed"
 
 ```bash
-# 1. Verifique string MongoDB
-echo $MONGODB_URI
+# 1. Verifique as variáveis do MySQL
+echo $DB_HOST
+echo $DB_USER
 
 # 2. Teste conexão
-mongo "seu-mongodb-uri"
+mysql -h seu-host-mysql -u seu-usuario -p sored
 
-# 3. Verifique credenciais em MongoDB Atlas
+# 3. Verifique credenciais e permissões no provedor MySQL
 ```
 
 ---
@@ -268,6 +278,8 @@ mongo "seu-mongodb-uri"
 - [ ] **NUNCA** commite `.env` com credenciais no Git
 - [ ] Use credenciais de **PRODUÇÃO** (não sandbox)
 - [ ] `JWT_SECRET` deve ser forte (20+ caracteres aleatórios)
+- [ ] `VITE_API_URL` aponta para o backend público correto
+- [ ] `FRONTEND_URL_PRODUCTION` aponta para o frontend público correto
 - [ ] HTTPS em ambos frontend e backend
 - [ ] Webhook Secret está configurado
 - [ ] Rate limiting ativo no backend

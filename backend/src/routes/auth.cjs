@@ -17,6 +17,12 @@ const {
 const crypto = require('crypto');
 const { sendWelcomeEmail } = require('../services/emailService');
 const isProduction = process.env.NODE_ENV === 'production';
+const cookieOptions = {
+  httpOnly: true,
+  sameSite: isProduction ? 'none' : 'lax',
+  secure: isProduction,
+  path: '/',
+};
 
 const router = express.Router();
 
@@ -26,8 +32,16 @@ function generateRefreshToken() {
 }
 
 function issueSession(res, token, refreshToken) {
-  res.cookie('token', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 });
-  res.cookie('refreshToken', refreshToken, { httpOnly: true, sameSite: 'lax', maxAge: 30 * 24 * 60 * 60 * 1000 });
+  res.cookie('token', token, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 });
+  res.cookie('refreshToken', refreshToken, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
+}
+
+function buildUserResponse(user) {
+  return {
+    id: user.id,
+    email: user.email,
+    tenantId: user.tenant_id ?? user.tenantId,
+  };
 }
 
 function blockedPayload(access) {
@@ -194,8 +208,8 @@ router.post('/signup', async (req, res) => {
       `RT-${Date.now()}`, userId, refreshToken, expiresAt
     ]);
 
-    res.cookie('token', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 });
-    res.cookie('refreshToken', refreshToken, { httpOnly: true, sameSite: 'lax', maxAge: 30 * 24 * 60 * 60 * 1000 });
+    res.cookie('token', token, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.cookie('refreshToken', refreshToken, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
     res.json({
       user: {
         id: userId,
@@ -261,8 +275,8 @@ router.post('/login', async (req, res) => {
     await db.query('INSERT INTO refresh_tokens (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)', [
       `RT-${Date.now()}`, user.id, refreshToken, expiresAt
     ]);
-    res.cookie('token', token, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 });
-    res.cookie('refreshToken', refreshToken, { httpOnly: true, sameSite: 'lax', maxAge: 30 * 24 * 60 * 60 * 1000 });
+    res.cookie('token', token, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.cookie('refreshToken', refreshToken, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
     return res.status(200).json({
       user: {
         id: user.id,
@@ -311,7 +325,14 @@ router.get('/verify', async (req, res) => {
     if (!access.allowed) {
       return res.status(403).json(blockedPayload(access));
     }
-    return res.status(200).json({ user: decoded, access });
+    return res.status(200).json({
+      user: {
+        id: decoded.userId,
+        email: decoded.email,
+        tenantId: decoded.tenantId,
+      },
+      access,
+    });
   } catch (error) {
     return res.status(401).json({ error: 'Invalid token' });
   }
@@ -347,8 +368,8 @@ router.post('/refresh', async (req, res) => {
         { expiresIn: '7d' }
       );
 
-      res.cookie('token', newToken, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 });
-      res.json({ user: { id: user.id, email: user.email, tenantId: user.tenant_id }, access });
+      res.cookie('token', newToken, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 });
+      res.json({ user: buildUserResponse(user), access });
     } catch (error) {
       if (!canUseFallbackAuth(error)) {
         throw error;
@@ -372,8 +393,8 @@ router.post('/refresh', async (req, res) => {
         JWT_SECRET,
         { expiresIn: '7d' }
       );
-      res.cookie('token', newToken, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 });
-      return res.json({ user: { id: user.id, email: user.email, tenantId: user.tenantId }, access });
+      res.cookie('token', newToken, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 });
+      return res.json({ user: buildUserResponse(user), access });
     }
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
@@ -394,8 +415,8 @@ router.post('/logout', async (req, res) => {
         await deleteRefreshToken(refreshToken);
       }
     }
-    res.clearCookie('token');
-    res.clearCookie('refreshToken');
+    res.clearCookie('token', cookieOptions);
+    res.clearCookie('refreshToken', cookieOptions);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Logout failed' });

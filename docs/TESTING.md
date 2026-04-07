@@ -1,6 +1,6 @@
-# 🧪 Testes Automatizados - SORED
+# 🧪 Guia de Testes Automatizados - SORED
 
-Sistema completo de testes automatizados para validação de produção do SORED (Sistema de Orçamento Rápido).
+Este guia reúne a suíte automatizada do SORED para validação, cobertura e deploy com segurança.
 
 ## 📋 Visão Geral
 
@@ -45,7 +45,7 @@ Este projeto implementa uma suíte completa de testes automatizados que garante 
 - Cálculos com frete
 - Validação de integridade end-to-end
 
-## 🚀 Como Executar os Testes
+## 🚀 Execução
 
 ### Executar todos os testes
 ```bash
@@ -126,7 +126,7 @@ RELATÓRIO FINAL DE VALIDAÇÃO
 ✓ SISTEMA PRONTO PARA PRODUÇÃO! 🚀
 ```
 
-## 📝 Estrutura de Testes
+## 📝 Estrutura
 
 ```
 src/
@@ -222,14 +222,14 @@ module.exports = {
 };
 ```
 
-## 📈 Métricas de Qualidade
+## 📈 Métricas
 
 - **Total de Testes**: ~86+ casos de teste
 - **Cobertura**: Componentes principais, contextos e integrações
 - **Tempo de Execução**: ~15-30 segundos
 - **Confiabilidade**: Testes isolados com mocks apropriados
 
-## 🐛 Debugging
+## 🐛 Depuração
 
 ### Executar testes com output detalhado
 ```bash
@@ -246,7 +246,7 @@ npm test -- DataContext.production.test.tsx
 npm test -- --watch
 ```
 
-## ✅ Critérios de Aprovação para Produção
+## ✅ Critérios de Aprovação
 
 Para o sistema ser aprovado para produção, todos os seguintes critérios devem ser atendidos:
 
@@ -261,7 +261,7 @@ Para o sistema ser aprovado para produção, todos os seguintes critérios devem
    - Geração de PDF
    - Persistência de Dados
 
-## 🚀 Deploy para Produção
+## 🚀 Deploy
 
 Após validação bem-sucedida:
 

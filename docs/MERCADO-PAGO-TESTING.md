@@ -182,7 +182,7 @@ tail -f ngrok-logs.txt
 # 3. Ou aguarde data de próxima cobrança automática
 
 # Verifique no banco:
-sqlite3 backend/data/sored.db
+mysql -h seu-host-mysql -u seu-usuario -p sored
 > SELECT * FROM payments WHERE status='approved' LIMIT 1;
 ```
 
@@ -240,7 +240,10 @@ required_vars=(
   "MERCADO_PAGO_PUBLIC_KEY"
   "MERCADO_PAGO_WEBHOOK_SECRET"
   "JWT_SECRET"
-  "MONGODB_URI"
+  "DB_HOST"
+  "DB_USER"
+  "DB_PASSWORD"
+  "DB_NAME"
 )
 
 for var in "${required_vars[@]}"; do
@@ -377,8 +380,8 @@ async function testConcurrency() {
   expect(results.every(r => r.status === 'approved')).toBe(true);
   
   // Database deve estar consistente
-  const count = db.prepare('SELECT COUNT(*) FROM subscriptions').get();
-  expect(count).toBe(10);
+  const [rows] = await db.query('SELECT COUNT(*) AS count FROM subscriptions');
+  expect(rows[0].count).toBe(10);
 }
 ```
 
@@ -427,8 +430,8 @@ curl -s https://seu-backend.com/api/health && echo "  ✅ Backend up" || echo " 
 
 echo ""
 echo "✓ Database:"
-# Tente conectar MongoDB
-mongo "mongodb+srv://..." --eval "db.adminCommand('ping')" && echo "  ✅ MongoDB up" || echo "  ❌ MongoDB down"
+# Tente conectar MySQL
+mysql -h seu-host-mysql -u seu-usuario -p sored -e "SELECT 1;" && echo "  ✅ MySQL up" || echo "  ❌ MySQL down"
 
 echo ""
 echo "✓ Mercado Pago:"
@@ -581,4 +584,3 @@ Sistema pronto para produção. Todos os testes passaram com sucesso.
 7. ✅ Monitoramento 24h
 
 **Status**: Pronto para testes! 🚀
-

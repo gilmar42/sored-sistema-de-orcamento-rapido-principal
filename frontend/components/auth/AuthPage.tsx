@@ -10,7 +10,7 @@ interface AuthPageProps {
 export const AuthPage: React.FC<AuthPageProps> = ({ paymentApproved = false, initialView = 'signup' }) => {
   const [isLoginView, setIsLoginView] = useState(paymentApproved ? false : initialView === 'login');
   const { login, signup, authError } = useAuth();
-  const isDev = typeof process !== 'undefined' ? process.env?.NODE_ENV !== 'production' : false;
+  const isDev = typeof process !== 'undefined' ? process.env.NODE_ENV !== 'production' : false;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

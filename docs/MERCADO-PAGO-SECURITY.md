@@ -163,9 +163,11 @@ router.post('/webhooks', async (req, res) => {
   const eventId = req.body.data?.id;
   
   // Verifique se já foi processado
-  const existing = await db.prepare(
-    'SELECT * FROM webhook_events WHERE event_id = ?'
-  ).get(eventId);
+  const [existingRows] = await db.query(
+    'SELECT * FROM webhook_events WHERE event_id = ?',
+    [eventId]
+  );
+  const existing = existingRows[0];
   
   if (existing) {
     return res.status(200).json({ message: 'Already processed' });
@@ -175,9 +177,10 @@ router.post('/webhooks', async (req, res) => {
   try {
     // ... processamento ...
     
-    db.prepare(
-      'INSERT INTO webhook_events (event_id, processed_at) VALUES (?, ?)'
-    ).run(eventId, new Date());
+    await db.query(
+      'INSERT INTO webhook_events (event_id, processed_at) VALUES (?, ?)',
+      [eventId, new Date()]
+    );
     
     res.status(200).json({ received: true });
   } catch (err) {
@@ -244,10 +247,13 @@ function authMiddleware(req, res, next) {
 // Usuário só pode ver/gerenciar seus próprios pagamentos
 
 router.get('/subscriptions/:id', authMiddleware, async (req, res) => {
-  const subscription = await Subscription.findById(req.params.id);
-  
-  // Verificar propriedade
-  if (subscription.userId.toString() !== req.userId) {
+  const [rows] = await db.query(
+    'SELECT * FROM subscriptions WHERE id = ? AND user_id = ?',
+    [req.params.id, req.userId]
+  );
+  const subscription = rows[0];
+
+  if (!subscription) {
     return res.status(403).json({ error: 'Access denied' });
   }
   
@@ -319,7 +325,7 @@ console.log('Payment attempt by:', req.body.email, 'Amount:', req.body.amount);
 ### 6.2 Audit Log para Pagamentos
 
 ```javascript
-// SQLite audit table
+// Tabela de auditoria no banco
 db.exec(`
   CREATE TABLE IF NOT EXISTS audit_log (
     id TEXT PRIMARY KEY,
@@ -333,10 +339,10 @@ db.exec(`
 `);
 
 function logAudit(userId, eventType, action, result, ip) {
-  db.prepare(`
-    INSERT INTO audit_log (id, user_id, event_type, action, result, ip_address)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(uuidv4(), userId, eventType, action, result, ip);
+  db.query(
+    'INSERT INTO audit_log (id, user_id, event_type, action, result, ip_address) VALUES (?, ?, ?, ?, ?, ?)',
+    [uuidv4(), userId, eventType, action, result, ip]
+  );
 }
 
 // Uso
@@ -400,10 +406,10 @@ router.post('/subscriptions', authMiddleware, async (req, res) => {
 // Previna SQL Injection com prepared statements
 
 // ✅ CORRETO - Prepared statement
-db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+await db.query('SELECT * FROM users WHERE email = ?', [email]);
 
 // ❌ ERRADO - String interpolation
-db.exec(`SELECT * FROM users WHERE email = '${email}'`);
+db.query(`SELECT * FROM users WHERE email = '${email}'`);
 ```
 
 ---
@@ -414,7 +420,7 @@ db.exec(`SELECT * FROM users WHERE email = '${email}'`);
 
 ```javascript
 // ❌ NUNCA faça isso
-db.prepare('INSERT INTO cards (number, cvv) VALUES (?, ?)');
+await db.query('INSERT INTO cards (number, cvv) VALUES (?, ?)', [number, cvv]);
 
 // ✅ SEMPRE use token do Mercado Pago
 const { cardTokenId } = await mp.createCardToken({
@@ -422,7 +428,7 @@ const { cardTokenId } = await mp.createCardToken({
 });
 
 // Armazene apenas o token, não o cartão
-db.prepare('INSERT INTO subscriptions (mp_card_token) VALUES (?)').run(cardTokenId);
+await db.query('INSERT INTO subscriptions (mp_card_token) VALUES (?)', [cardTokenId]);
 ```
 
 ### 8.2 Máscara para Exibição
@@ -473,17 +479,21 @@ app.use((err, req, res, next) => {
 ```javascript
 // Nunca retorne dados sensíveis do banco
 router.get('/user/:id', async (req, res) => {
-  const user = await User.findById(req.params.id);
+  const [rows] = await db.query(
+    'SELECT id, email, name FROM users WHERE id = ?',
+    [req.params.id]
+  );
+  const user = rows[0];
   
   // ❌ ERRADO
   // res.json(user); // Expõe password_hash
   
   // ✅ CORRETO - Retorne apenas o necessário
-  res.json({
+  res.json(user ? {
     id: user.id,
     email: user.email,
     name: user.name
-  });
+  } : null);
 });
 ```
 
@@ -497,10 +507,11 @@ router.get('/user/:id', async (req, res) => {
 // Detecte padrões suspeitos
 
 function checkAnomalies(payment) {
-  const recentPayments = db.prepare(`
+  const [recentPaymentsRows] = await db.query(`
     SELECT COUNT(*) as count FROM payments 
-    WHERE payer_email = ? AND created_at > datetime('now', '-1 hour')
-  `).get(payment.email);
+    WHERE payer_email = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)
+  `, [payment.email]);
+  const recentPayments = recentPaymentsRows[0];
   
   // Alerta se muitos pagamentos do mesmo email em 1 hora
   if (recentPayments.count > 5) {
@@ -526,12 +537,12 @@ db.exec(`
 `);
 
 // Monitore taxa de sucesso
-function webhookHealthCheck() {
-  const last24h = db.prepare(`
+async function webhookHealthCheck() {
+  const [last24h] = await db.query(`
     SELECT status, COUNT(*) as count FROM webhook_log
-    WHERE timestamp > datetime('now', '-1 day')
+    WHERE timestamp > DATE_SUB(NOW(), INTERVAL 1 DAY)
     GROUP BY status
-  `).all();
+  `);
   
   // Alerte se muitas falhas
 }
@@ -565,4 +576,3 @@ function webhookHealthCheck() {
 - [PCI Compliance](https://www.pcisecuritystandards.org/)
 - [Mercado Pago Security](https://developers.mercadopago.com.br/en/guides/security)
 - [Node.js Security Best Practices](https://nodejs.org/en/docs/guides/security/)
-

@@ -1,4 +1,4 @@
-# Mercado Pago - Setup Completo para Produção
+# Mercado Pago - Guia Completo para Produção
 
 ## 📋 Pré-requisitos
 
@@ -7,8 +7,8 @@
 - [ ] Acesso ao painel de desenvolvedor do Mercado Pago
 - [ ] Servidor backend com acesso HTTPS público
 - [ ] Frontend deployado em domínio com HTTPS
-- [ ] MongoDB em produção (Atlas ou self-hosted)
-- [ ] SQLite configurado para pagamentos
+- [ ] MySQL em produção
+- [ ] Tabelas de pagamento configuradas
 
 ---
 
@@ -49,36 +49,38 @@ Antes de ir para produção, teste com as chaves de **Desenvolvimento** usando d
 
 ### 2.1 Atualize `.env` do Backend
 
-Crie/atualize o arquivo `backend/.env`:
+Crie/atualize o arquivo `backend/.env` com os valores abaixo:
 
 ```dotenv
-# ============ SEGURANÇA ============
+# Segurança
 JWT_SECRET=sua-chave-super-secreta-aqui-mude-isso
 NODE_ENV=production
-
-# ============ SERVIDOR ============
 PORT=5000
+
+# CORS e cookies
+# Use a URL local só para desenvolvimento.
 FRONTEND_URL=http://localhost:5173
+# Use a URL pública em produção.
 FRONTEND_URL_PRODUCTION=https://seu-dominio.com
 
-# ============ MERCADO PAGO (PRODUÇÃO) ============
-# Copie do painel de credenciais - AMBIENTE PRODUÇÃO
+# Mercado Pago (produção)
 MP_ACCESS_TOKEN=APP_USR-seu-access-token-aqui
 MERCADO_PAGO_ACCESS_TOKEN=APP_USR-seu-access-token-aqui
 MERCADO_PAGO_PUBLIC_KEY=APP_USR-sua-public-key-aqui
 MERCADO_PAGO_WEBHOOK_SECRET=seu-webhook-secret-aqui
-
-# URLs de Retorno
 MP_SUCCESS_URL=https://seu-dominio.com/sucesso
 MP_FAILURE_URL=https://seu-dominio.com/falha
 MP_PENDING_URL=https://seu-dominio.com/pendente
+MERCADO_PAGO_WEBHOOK_URL=https://seu-backend-url.com/api/payments/webhooks
 
-# ============ BANCO DE DADOS ============
-MONGODB_URI=mongodb+srv://usuario:senha@seu-cluster.mongodb.net/sored?retryWrites=true&w=majority
-# Ou para MongoDB local em produção:
-# MONGODB_URI=mongodb://seu-server-mongodb:27017/sored
+# Banco de dados
+DB_HOST=seu-host-mysql
+DB_USER=seu-usuario
+DB_PASSWORD=sua-senha
+DB_NAME=sored
+DB_PORT=3306
 
-# ============ CURRENCY & PAGAMENTO ============
+# Pagamento
 CURRENCY=BRL
 ```
 
@@ -102,19 +104,19 @@ export MERCADO_PAGO_PUBLIC_KEY="APP_USR-test-..."
 Crie/atualize o arquivo `frontend/.env`:
 
 ```dotenv
-# Backend API
+# Backend API pública
 VITE_API_URL=https://seu-backend-url.com/api
 
-# Mercado Pago (PRODUÇÃO)
+# Mercado Pago (produção)
 VITE_MP_PUBLIC_KEY=APP_USR-sua-public-key-aqui
 
-# Frontend URL
+# URL pública do frontend
 VITE_FRONTEND_URL=https://seu-dominio.com
 ```
 
 ### 3.2 Publicar as Variáveis para Build
 
-Ao fazer build do Vite, as variáveis `VITE_*` são incluídas como strings:
+Ao fazer build do Vite, as variáveis `VITE_*` são incluídas como strings. Ajuste o valor antes do build:
 
 ```bash
 # Local
@@ -174,29 +176,32 @@ const envOrigins = [
 ```
 
 Certifique-se de que estas variáveis estão definidas:
-- ✅ `FRONTEND_URL_PRODUCTION=https://seu-dominio.com`
+- ✅ `FRONTEND_URL=https://localhost:5173` para desenvolvimento
+- ✅ `FRONTEND_URL_PRODUCTION=https://seu-dominio.com` para produção
+
+Como os cookies de autenticação agora são emitidos com `sameSite=none` em produção, o backend e o frontend precisam estar em HTTPS.
 
 ---
 
-## 🗄️ 6. Configurar MongoDB para Produção
+## 🗄️ 6. Configurar MySQL para Produção
 
-### 6.1 Opção A: MongoDB Atlas (Recomendado)
+### 6.1 Opção A: MySQL gerenciado (Recomendado)
 
-1. Acesse [MongoDB Atlas](https://www.mongodb.com/cloud/atlas)
-2. Crie um cluster gratuito ou pago
-3. Configure credenciais de usuário
-4. Obtenha a string de conexão:
-   ```
-   mongodb+srv://user:password@cluster.mongodb.net/sored?retryWrites=true&w=majority
-   ```
-5. Defina em `backend/.env`:
+1. Use um provedor de MySQL compatível com sua hospedagem
+2. Crie o banco `sored`
+3. Configure usuário e senha com permissão de leitura e escrita
+4. Defina em `backend/.env`:
    ```dotenv
-   MONGODB_URI=mongodb+srv://user:password@cluster.mongodb.net/sored?retryWrites=true&w=majority
+   DB_HOST=seu-host-mysql
+   DB_USER=seu-usuario
+   DB_PASSWORD=sua-senha
+   DB_NAME=sored
+   DB_PORT=3306
    ```
 
-### 6.2 Opção B: MongoDB Self-Hosted
+### 6.2 Opção B: MySQL self-hosted
 
-Certifique-se de que seu servidor MongoDB está:
+Certifique-se de que seu servidor MySQL está:
 - Acessível apenas internamente (não exponha para internet)
 - Com autenticação habilitada
 - Com backups automáticos
@@ -274,8 +279,9 @@ sudo certbot certonly --standalone -d seu-backend-url.com
 #    - Root Directory: frontend/
 
 # 3. Adicione variáveis de ambiente:
-VITE_API_URL = https://seu-backend-url.com/api
-VITE_MP_PUBLIC_KEY = APP_USR-sua-public-key-aqui
+VITE_API_URL=https://seu-backend-url.com/api
+VITE_MP_PUBLIC_KEY=APP_USR-sua-public-key-aqui
+VITE_FRONTEND_URL=https://seu-dominio.com
 ```
 
 ### 8.2 Netlify
@@ -307,8 +313,9 @@ VITE_MP_PUBLIC_KEY = APP_USR-sua-public-key-aqui
 - [ ] Variáveis de ambiente todas definidas
 - [ ] `NODE_ENV=production`
 - [ ] `JWT_SECRET` forte (20+ caracteres aleatórios)
+- [ ] `FRONTEND_URL_PRODUCTION` aponta para o domínio público correto
 - [ ] CORS configurado com domínio de produção
-- [ ] MongoDB em produção (Atlas ou self-hosted)
+- [ ] Banco MySQL de produção configurado
 - [ ] HTTPS habilitado
 - [ ] Rate limiting configurado
 - [ ] Logs configurados (journald, PM2, CloudWatch)
@@ -317,6 +324,7 @@ VITE_MP_PUBLIC_KEY = APP_USR-sua-public-key-aqui
 - [ ] Variáveis `VITE_*` definidas
 - [ ] `VITE_API_URL` apontando para backend de produção
 - [ ] `VITE_MP_PUBLIC_KEY` com chave de produção
+- [ ] `VITE_FRONTEND_URL` com o domínio público
 - [ ] Build otimizado: `npm run build`
 - [ ] Teste a SubscriptionModal após build
 
@@ -439,11 +447,11 @@ const mpKey = process.env.VITE_MP_PUBLIC_KEY || '';
    echo -n "timestamp|url|payload" | openssl dgst -sha256 -hmac "sua-secret"
    ```
 
-### Pagamento não integra com MongoDB
+### Pagamento não integra com MySQL
 
 ```bash
-# Verifique conexão MongoDB
-mongo "mongodb+srv://user:pass@cluster.mongodb.net/sored"
+# Verifique conexão MySQL
+mysql -h seu-host-mysql -u seu-usuario -p sored
 # Deverá conectar sem erro
 ```
 
@@ -482,4 +490,3 @@ location /api/payments/ {
 9. ✅ Ative alertas
 
 **Status**: Pronto para produção ✨
-

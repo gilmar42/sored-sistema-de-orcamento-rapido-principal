@@ -14,6 +14,23 @@ interface AccessState {
   blockReason: string | null;
 }
 
+const normalizeUser = (user: any): User | null => {
+  if (!user) return null;
+  const id = user.id ?? user.userId ?? null;
+  const email = user.email ?? null;
+  const tenantId = user.tenantId ?? null;
+
+  if (!id || !email || !tenantId) {
+    return null;
+  }
+
+  return {
+    id,
+    email,
+    tenantId,
+  };
+};
+
 interface AuthContextType {
   currentUser: User | null;
   tenantId: string | null;
@@ -57,15 +74,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const checkSession = async () => {
       try {
         const data = await apiService.verifyToken();
-        if (data && data.user) {
+        const normalizedUser = normalizeUser(data?.user);
+        if (normalizedUser) {
           setAuthError(null);
           applyAccess(data.access);
-          setCurrentUser({
-            id: data.user.id,
-            email: data.user.email,
-            tenantId: data.user.tenantId,
-            // passwordHash não é retornado do backend
-          });
+          setCurrentUser(normalizedUser);
         } else {
           setCurrentUser(null);
           applyAccess(null);
@@ -88,14 +101,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       setAuthError(null);
       const data = await apiService.login(email, password);
-      if (data && data.user) {
+      const normalizedUser = normalizeUser(data?.user);
+      if (normalizedUser) {
         setAuthError(null);
         applyAccess(data.access);
-        setCurrentUser({
-          id: data.user.id,
-          email: data.user.email,
-          tenantId: data.user.tenantId,
-        });
+        setCurrentUser(normalizedUser);
         return true;
       }
       return false;
@@ -113,14 +123,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       setAuthError(null);
       const data = await apiService.signup(companyName, email, password);
-      if (data && data.user) {
+      const normalizedUser = normalizeUser(data?.user);
+      if (normalizedUser) {
         setAuthError(null);
         applyAccess(data.access);
-        setCurrentUser({
-          id: data.user.id,
-          email: data.user.email,
-          tenantId: data.user.tenantId,
-        });
+        setCurrentUser(normalizedUser);
         return true;
       }
       return false;
