@@ -1,0 +1,25 @@
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# SORED - Configuração de Roteamento para Hostinger (LiteSpeed)
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+RewriteEngine On
+
+# 1. Se o arquivo físico (imagem, JS, CSS) não existir na pasta de build...
+RewriteCond %{DOCUMENT_ROOT}/frontend/dist/%{REQUEST_URI} -f
+RewriteRule ^(.*)$ /frontend/dist/$1 [L]
+
+# 2. Manda todo o resto para o processo Node.js (Phusion Passenger)
+# O Hostinger utiliza o arquivo configurado como "Startup File" no hPanel.
+# Geralmente não é necessário Rewrite para o binário se o Passenger estiver ativo,
+# mas isto garante que as rotas do React e API cheguem ao server.js.
+
+<IfModule mod_passenger.c>
+    PassengerAppRoot /home/u536642070/public_html
+    PassengerAppType node
+    PassengerStartupFile server.js
+</IfModule>
+
+# Fallback para rotas do React (SPA)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ server.js [L]

@@ -1,0 +1,35 @@
+{
+  "users": [
+    {
+      "id": "U-1775522894124-10229e",
+      "email": "debugteste@example.com",
+      "passwordHash": "$2b$10$2X/Nu0u4b8Aw/sL2RNjye.fI4laOY6tG9TvZRiTKTdJU4.TsB2pMm",
+      "tenantId": "T-1775522894124-538e0f",
+      "name": null,
+      "trialStartedAt": "2026-04-07 00:48:14",
+      "trialEndsAt": "2026-04-12 00:48:14",
+      "accessStatus": "trial"
+    }
+  ],
+  "tenants": [
+    {
+      "id": "T-1775522894124-538e0f",
+      "companyName": "Debug Teste",
+      "createdAt": "2026-04-07 00:48:14"
+    }
+  ],
+  "refreshTokens": [
+    {
+      "id": "RT-1775522894155-bf4403",
+      "userId": "U-1775522894124-10229e",
+      "token": "71e2c023f89ae59059241384af490c479098ffff0d6bcb58bce5ed078597eacfbc6e4dda35fde0dbc9e6ff10470e4f6d3de3670c0a01021d8fba872ea4e41435",
+      "expiresAt": "2026-05-07 00:48:14"
+    },
+    {
+      "id": "RT-1775522898987-10decd",
+      "userId": "U-1775522894124-10229e",
+      "token": "caf6ee33fc3d1d57b7c5b5976db53fe14a2e9259cd765705c03419468e450ee31fb9a95bd8f1ab794528216ee63a6f8e26e81df5143604981708057a191ef7ec",
+      "expiresAt": "2026-05-07 00:48:18"
+    }
+  ]
+}
