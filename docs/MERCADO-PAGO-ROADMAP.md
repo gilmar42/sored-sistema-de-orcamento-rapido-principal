@@ -19,7 +19,7 @@ Toda a documentação necessária está organizada em 5 documentos principais:
 **O quê tem**:
 - Obter credenciais
 - Configurar .env
-- Deploy (Vercel/Render/AWS)
+- Deploy (Hostinger/Render/AWS)
 - Testar pagamento
 - Troubleshooting comum
 
@@ -238,7 +238,7 @@ graph TD
 - [ ] Tenho domínio com HTTPS configurado
 - [ ] Backend será deployado em servidor HTTPS acessível publicamente
 - [ ] Tenho acesso a MongoDB em produção (Atlas ou self-hosted)
-- [ ] Tenho acesso a plataforma de deploy (Vercel, Render, AWS, etc)
+- [ ] Tenho acesso a plataforma de deploy (Hostinger, Render, AWS, etc)
 - [ ] O projeto já passa em `npm test` e `npm run build`
 - [ ] Tenho `.env` no `.gitignore` (não commitou credenciais)
 - [ ] Tenho suporte/contato configurado para produção

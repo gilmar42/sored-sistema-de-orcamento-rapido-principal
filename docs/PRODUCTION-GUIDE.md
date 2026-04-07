@@ -118,7 +118,7 @@ Após todos os testes passarem:
 2. **A pasta `dist/` estará pronta para deploy**
 
 3. **Opções de deploy**:
-   - Vercel
+   - Hostinger
    - Netlify
    - AWS S3 + CloudFront
    - Azure Static Web Apps

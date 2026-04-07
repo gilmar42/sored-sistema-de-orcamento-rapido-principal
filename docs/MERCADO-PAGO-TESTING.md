@@ -283,7 +283,7 @@ chmod +x scripts/health-check.sh
 # Deploy para staging com credenciais de PRODUÇÃO (mas URL diferente)
 
 # 1. Setup staging server
-# Você pode usar Vercel preview ou staging branch
+# Você pode usar staging branch ou ambiente de homologação
 
 # 2. Configure com credenciais PRODUÇÃO do MP
 # Mas use staging frontend URL:
@@ -300,7 +300,7 @@ npm run validate:production
 
 ```bash
 # Monitore logs em tempo real
-# Vercel: vercel logs seu-projeto
+# Consulte os logs no painel da hospedagem
 
 # Ou use Sentry se configurado:
 # https://sentry.io/organizations/seu-org/issues/

@@ -20,7 +20,7 @@ Defina no ambiente (ex.: `.env` do servidor):
 - `PORT`
 
 ### Frontend
-Defina no ambiente de build (ex.: Vercel/Netlify/Render):
+Defina no ambiente de build (ex.: Hostinger/Netlify/Render):
 - `VITE_API_URL` (URL pública do backend, ex.: `https://api.seudominio.com`)
 - `VITE_MP_PUBLIC_KEY`
 

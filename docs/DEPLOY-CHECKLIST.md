@@ -67,14 +67,11 @@
 
 ## Deploy
 
-### Opção 1: Vercel (Recomendado)
+### Opção 1: Hostinger (Recomendado)
 
 ```powershell
-# Instalar Vercel CLI
-npm i -g vercel
-
-# Fazer deploy
-vercel --prod
+# Publicar o build pelo painel de hospedagem
+# Envie a pasta de build gerada pelo projeto
 ```
 
 ### Opção 2: Netlify
@@ -202,9 +199,9 @@ az staticwebapp create \
 
 Se algo der errado:
 
-### Vercel
+### Hostinger
 ```powershell
-vercel rollback
+# Restaurar a versão anterior pelo painel da hospedagem
 ```
 
 ### Netlify
@@ -221,7 +218,7 @@ git checkout <commit-anterior>
 npm run build
 
 # Redeploy
-vercel --prod
+# Publicar novamente pelo painel da hospedagem
 # ou
 netlify deploy --prod --dir=dist
 ```

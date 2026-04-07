@@ -89,7 +89,7 @@ CURRENCY=BRL
 export MP_ACCESS_TOKEN="APP_USR-test-..."
 export MERCADO_PAGO_PUBLIC_KEY="APP_USR-test-..."
 
-# Para produção (Vercel, Render, AWS, etc):
+# Para produção (Hostinger, Render, AWS, etc):
 # Use o painel da plataforma para configurar secrets
 ```
 
@@ -120,8 +120,8 @@ Ao fazer build do Vite, as variáveis `VITE_*` são incluídas como strings:
 # Local
 VITE_API_URL=http://localhost:5000/api npm run build
 
-# Produção (Vercel)
-# Defina as variáveis no painel de variáveis de ambiente da Vercel
+# Produção (Hostinger)
+# Defina as variáveis no painel de variáveis de ambiente da hospedagem
 ```
 
 ---
@@ -205,14 +205,14 @@ Certifique-se de que seu servidor MongoDB está:
 
 ## 📦 7. Deploy - Backend
 
-### 7.1 Vercel (Recomendado para Node.js)
+### 7.1 Hostinger (Recomendado para Node.js)
 
 ```bash
-# 1. Instale vercel CLI
-npm install -g vercel
+# 1. Publique o backend pelo painel da hospedagem
 
-# 2. Deploy
-vercel
+
+
+
 
 # 3. Configure variáveis de ambiente no painel
 # Vá em Project Settings > Environment Variables
@@ -263,10 +263,10 @@ sudo certbot certonly --standalone -d seu-backend-url.com
 
 ## 🎀 8. Deploy - Frontend
 
-### 8.1 Vercel (Recomendado)
+### 8.1 Hostinger (Recomendado)
 
 ```bash
-# 1. Conecte seu repositório em vercel.com
+# 1. Conecte seu repositório em .com
 # 2. Configure Build Settings:
 #    - Framework: Vite
 #    - Build Command: npm run build
@@ -373,12 +373,12 @@ git add .
 git commit -m "chore: production mercado pago setup"
 git push origin main
 
-# 2. Deploy Backend
-# Via Vercel CLI ou painel da plataforma
-vercel deploy --prod
+ Backend
+# Via painel da hospedagem ou pipeline de deploy
+ deploy --prod
 
 # 3. Deploy Frontend
-# Vercel auto-deploya ao fazer push
+# A hospedagem pode fazer deploy automático ao fazer push
 
 # 4. Valide o webhook
 curl https://seu-backend-url.com/api/health

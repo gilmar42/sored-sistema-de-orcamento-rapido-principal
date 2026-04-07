@@ -188,7 +188,7 @@ curl http://localhost:5000/api/materials \
 - Usar PostgreSQL ou MySQL (opcional)
 
 ### Frontend:
-- Vercel / Netlify
+- Hostinger / Netlify
 - Atualizar `VITE_API_URL` para URL do backend em produção
 
 ---

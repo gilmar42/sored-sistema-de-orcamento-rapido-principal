@@ -20,7 +20,7 @@ echo "frontend/.env" >> .gitignore
 echo ".env.local" >> .gitignore
 
 # Configure segredos na plataforma de deploy
-# Vercel: Painel > Settings > Environment Variables
+# Hospedagem: Painel > Settings > Environment Variables
 # Render: Painel > Environment
 # AWS: AWS Secrets Manager
 ```

@@ -106,17 +106,17 @@ npm run build
 
 ## 🚀 PASSO 5: Deploy Backend (5 min)
 
-### Opção A: Vercel (Recomendado)
+### Opção A: Hostinger (Recomendado)
 
 ```bash
-# 1. Instale Vercel CLI
-npm install -g vercel
+# 1. Publique o build pelo painel de hospedagem
 
-# 2. Deploy
-vercel --prod
 
-# 3. Configure variáveis de ambiente no painel:
-#    https://vercel.com/seu-projeto/settings/environment-variables
+
+
+
+# 2. Configure variáveis de ambiente no painel da hospedagem:
+
 #    Adicione: MP_ACCESS_TOKEN, MERCADO_PAGO_PUBLIC_KEY, etc
 ```
 
@@ -149,8 +149,8 @@ pm2 start backend/src/app.js --name "sored"
 
 ## 🎀 PASSO 6: Deploy Frontend (3 min)
 
-**Se usando Vercel**:
-- Auto-deploya quando você faz push no main
+**Se usando Hostinger**:
+- Publique o build atualizado quando fizer push no main
 - Adicione variáveis `VITE_*` no painel
 
 **Se usando Netlify**:
@@ -305,4 +305,5 @@ Encontrou um problema?
 - [ ] Publicar para usuários reais
 
 **Status**: 🟢 Pronto para produção! 🚀
+
 

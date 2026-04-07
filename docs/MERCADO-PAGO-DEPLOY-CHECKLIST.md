@@ -116,7 +116,7 @@ VITE_FRONTEND_URL=https://seu-dominio.com         # ✅
 ### Servidor / Deployment
 
 #### Infraestrutura
-- [ ] Servidor em produção (Vercel, Render, AWS, etc)
+- [ ] Servidor em produção (Hostinger, Render, AWS, etc)
 - [ ] HTTPS habilitado e certificado válido
 - [ ] DNS configurado e apontando para servidor
 - [ ] Rate limiting habilitado
@@ -169,9 +169,9 @@ git push origin main
 
 ### 3. Deploy Backend
 
-**Vercel**:
+**Hostinger**:
 ```bash
-vercel deploy --prod
+# Publicar o build pela plataforma de hospedagem
 # Confirme variáveis de ambiente no painel
 ```
 
@@ -182,7 +182,7 @@ vercel deploy --prod
 
 ### 4. Deploy Frontend
 
-- Vercel auto-deploya ao push no main
+- A hospedagem pode fazer deploy automático ao push no main
 - Ou manualmente se usando outra plataforma
 
 ### 5. Validação Pós-Deploy
@@ -216,7 +216,7 @@ curl https://seu-backend.com/
 **Causa**: `VITE_MP_PUBLIC_KEY` não definida no build
 **Solução**: 
 ```bash
-# Vercel: Adicione em Settings > Environment Variables
+# Hospedagem: adicione em Settings > Environment Variables
 # Render: Adicione em Environment
 # Local: echo "VITE_MP_PUBLIC_KEY=..." >> frontend/.env
 ```
@@ -282,4 +282,3 @@ mongo "seu-mongodb-uri"
 4. **Contínuo**: Monitorar logs e métricas
 
 **Status**: 🟡 Em progresso → 🟢 Pronto para produção
-

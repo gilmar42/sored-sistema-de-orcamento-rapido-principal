@@ -273,7 +273,7 @@ npm run validate:production
 # 3. Deploy da pasta /dist para seu servidor/hosting
 
 # Exemplos de deploy:
-# Vercel: vercel --prod
+# Publicar o build pela plataforma de hospedagem
 # Netlify: netlify deploy --prod --dir=dist
 # AWS S3: aws s3 sync dist/ s3://seu-bucket/
 ```
