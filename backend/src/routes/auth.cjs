@@ -40,7 +40,7 @@ function blockedPayload(access) {
 }
 
 function canUseFallbackAuth(error) {
-  return isDatabaseUnavailable(error);
+  return !isProduction && isDatabaseUnavailable(error);
 }
 
 async function handleFallbackSignup(req, res) {
@@ -205,6 +205,9 @@ router.post('/signup', async (req, res) => {
       access,
     });
   } catch (error) {
+    if (isProduction && isDatabaseUnavailable(error)) {
+      return res.status(503).json({ error: 'Database unavailable' });
+    }
     if (canUseFallbackAuth(error)) {
       try {
         return await handleFallbackSignup(req, res);
@@ -269,6 +272,9 @@ router.post('/login', async (req, res) => {
       access,
     });
   } catch (error) {
+    if (isProduction && isDatabaseUnavailable(error)) {
+      return res.status(503).json({ error: 'Database unavailable' });
+    }
     if (canUseFallbackAuth(error)) {
       try {
         return await handleFallbackLogin(req, res);

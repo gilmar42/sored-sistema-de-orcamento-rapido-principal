@@ -10,6 +10,7 @@ interface AuthPageProps {
 export const AuthPage: React.FC<AuthPageProps> = ({ paymentApproved = false, initialView = 'signup' }) => {
   const [isLoginView, setIsLoginView] = useState(paymentApproved ? false : initialView === 'login');
   const { login, signup, authError } = useAuth();
+  const isDev = import.meta.env.DEV;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -167,7 +168,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ paymentApproved = false, ini
               </button>
             </div>
           </form>
-                    <div className="mt-4">
+                    {isDev && (
+                      <div className="mt-4">
                       <button
                         type="button"
                         onClick={handleDemoAccess}
@@ -179,7 +181,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ paymentApproved = false, ini
                       <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-2">
                         Cria uma conta temporária automaticamente
                       </p>
-                    </div>
+                      </div>
+                    )}
           <div className="text-center mt-6">
             <button onClick={toggleView} className="inline-block align-baseline font-bold text-sm text-primary hover:text-blue-500">
               {isLoginView ? 'Não tem uma conta? Cadastre-se' : 'Já tem uma conta? Faça login'}
