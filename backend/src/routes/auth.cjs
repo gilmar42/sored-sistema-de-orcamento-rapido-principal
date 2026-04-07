@@ -205,6 +205,9 @@ router.post('/signup', async (req, res) => {
       access,
     });
   } catch (error) {
+    if (error && error.code === 'DEMO_ACCOUNT') {
+      return res.status(400).json({ error: 'Demo accounts are not allowed in production' });
+    }
     if (isProduction && isDatabaseUnavailable(error)) {
       return res.status(503).json({ error: 'Database unavailable' });
     }
@@ -272,6 +275,9 @@ router.post('/login', async (req, res) => {
       access,
     });
   } catch (error) {
+    if (error && error.code === 'DEMO_ACCOUNT') {
+      return res.status(400).json({ error: 'Demo accounts are not allowed in production' });
+    }
     if (isProduction && isDatabaseUnavailable(error)) {
       return res.status(503).json({ error: 'Database unavailable' });
     }

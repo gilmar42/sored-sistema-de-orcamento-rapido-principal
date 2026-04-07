@@ -3,6 +3,9 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 
 const STORE_PATH = path.resolve(__dirname, '..', '..', 'data', 'auth-fallback.json');
+const DEMO_EMAILS = new Set(['debugteste@example.com']);
+const DEMO_EMAIL_SUFFIX = '@sored.demo';
+const DEMO_COMPANY_NAMES = new Set(['Empresa Demo', 'Debug Teste']);
 
 const EMPTY_STATE = {
   users: [],
@@ -30,11 +33,21 @@ async function loadState() {
   try {
     const raw = await fs.readFile(STORE_PATH, 'utf8');
     const parsed = JSON.parse(raw);
-    return {
+    const sanitized = sanitizeState({
       users: Array.isArray(parsed.users) ? parsed.users : [],
       tenants: Array.isArray(parsed.tenants) ? parsed.tenants : [],
       refreshTokens: Array.isArray(parsed.refreshTokens) ? parsed.refreshTokens : [],
-    };
+    });
+
+    if (
+      sanitized.users.length !== (Array.isArray(parsed.users) ? parsed.users.length : 0) ||
+      sanitized.tenants.length !== (Array.isArray(parsed.tenants) ? parsed.tenants.length : 0) ||
+      sanitized.refreshTokens.length !== (Array.isArray(parsed.refreshTokens) ? parsed.refreshTokens.length : 0)
+    ) {
+      await saveState(sanitized);
+    }
+
+    return sanitized;
   } catch {
     return { ...EMPTY_STATE };
   }
@@ -52,6 +65,17 @@ function generateId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 }
 
+function isDemoEmail(email) {
+  if (!email) return false;
+  const normalized = String(email).trim().toLowerCase();
+  return DEMO_EMAILS.has(normalized) || normalized.endsWith(DEMO_EMAIL_SUFFIX);
+}
+
+function isDemoCompanyName(companyName) {
+  if (!companyName) return false;
+  return DEMO_COMPANY_NAMES.has(String(companyName).trim());
+}
+
 function normalizeUserRecord(user) {
   if (!user) return null;
   return {
@@ -61,6 +85,43 @@ function normalizeUserRecord(user) {
     trialStartedAt: user.trialStartedAt || user.trial_started_at || null,
     trialEndsAt: user.trialEndsAt || user.trial_ends_at || null,
     accessStatus: user.accessStatus || user.access_status || 'trial',
+  };
+}
+
+function sanitizeState(state) {
+  const users = Array.isArray(state.users) ? state.users : [];
+  const tenants = Array.isArray(state.tenants) ? state.tenants : [];
+  const refreshTokens = Array.isArray(state.refreshTokens) ? state.refreshTokens : [];
+
+  const tenantIdsToRemove = new Set();
+  for (const tenant of tenants) {
+    if (isDemoCompanyName(tenant.companyName)) {
+      tenantIdsToRemove.add(tenant.id);
+    }
+  }
+
+  const cleanedUsers = users.filter((user) => {
+    const normalized = normalizeUserRecord(user);
+    const shouldRemove = isDemoEmail(normalized?.email) || tenantIdsToRemove.has(normalized?.tenantId);
+    if (shouldRemove && normalized?.tenantId) {
+      tenantIdsToRemove.add(normalized.tenantId);
+    }
+    return !shouldRemove;
+  });
+
+  const cleanedTenants = tenants.filter(
+    (tenant) => !tenantIdsToRemove.has(tenant.id) && !isDemoCompanyName(tenant.companyName)
+  );
+
+  const cleanedRefreshTokens = refreshTokens.filter((token) => {
+    const linkedUser = cleanedUsers.find((user) => user.id === token.userId);
+    return Boolean(linkedUser) && !isDemoEmail(linkedUser.email);
+  });
+
+  return {
+    users: cleanedUsers,
+    tenants: cleanedTenants,
+    refreshTokens: cleanedRefreshTokens,
   };
 }
 
@@ -81,6 +142,11 @@ function isFuture(datetime) {
 
 async function createTenantUserAndTrial(companyName, email, passwordHash) {
   const state = await loadState();
+  if (isDemoEmail(email) || isDemoCompanyName(companyName)) {
+    const error = new Error('Demo accounts are not allowed');
+    error.code = 'DEMO_ACCOUNT';
+    throw error;
+  }
   const existingUser = state.users.find((user) => user.email.toLowerCase() === email.toLowerCase());
   if (existingUser) {
     const error = new Error('User already exists');
