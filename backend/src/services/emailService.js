@@ -6,6 +6,8 @@ const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
 const FROM_EMAIL = process.env.FROM_EMAIL || SMTP_USER;
 const FROM_NAME = process.env.FROM_NAME || 'SORED - Sistema de Orçamento';
+const FRONTEND_URL = process.env.FRONTEND_URL_PRODUCTION || process.env.FRONTEND_URL || '';
+const isProduction = process.env.NODE_ENV === 'production';
 
 let transporter = null;
 
@@ -60,7 +62,7 @@ const sendWelcomeEmail = async ({ to, companyName, tenantId, userId }) => {
               Guarde essas informações em um local seguro. Você precisará delas para acessar o sistema.
             </p>
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}" 
+              <a href="${FRONTEND_URL || '#'}" 
                  style="display: inline-block; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; text-decoration: none; padding: 12px 30px; border-radius: 25px; font-weight: bold; font-size: 16px;">
                 Acessar o SORED
               </a>
@@ -78,7 +80,9 @@ const sendWelcomeEmail = async ({ to, companyName, tenantId, userId }) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log('Welcome email sent:', info.messageId);
+    if (!isProduction) {
+      console.log('Welcome email sent:', info.messageId);
+    }
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('Error sending welcome email:', error);

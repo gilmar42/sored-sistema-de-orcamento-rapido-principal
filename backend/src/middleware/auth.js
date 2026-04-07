@@ -4,6 +4,7 @@ const {
   isDatabaseUnavailable,
   reconcileAccess: reconcileFallbackAccess,
 } = require('../services/authFallbackStore.cjs');
+const isProduction = process.env.NODE_ENV === 'production';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
@@ -20,7 +21,7 @@ const authMiddleware = async (req, res, next) => {
     try {
       access = await reconcileUserAccess(decoded.userId);
     } catch (error) {
-      if (!isDatabaseUnavailable(error)) {
+      if (isProduction || !isDatabaseUnavailable(error)) {
         throw error;
       }
       access = await reconcileFallbackAccess(decoded.userId);

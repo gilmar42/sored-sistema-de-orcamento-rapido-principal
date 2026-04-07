@@ -15,6 +15,7 @@ const db = require('./config/database');
 const { initDB } = require('./config/database_utils.cjs');
 
 const app = express();
+const isProduction = process.env.NODE_ENV === 'production';
 
 const defaultOrigins = [
   'http://localhost:3000',
@@ -37,10 +38,6 @@ const envOrigins = [process.env.FRONTEND_URL, process.env.FRONTEND_URL_PRODUCTIO
 const allowedOrigins = Array.from(new Set([...envOrigins, ...defaultOrigins]));
 
 // Middleware CORS (dev + produção via env)
-app.use((req, res, next) => {
-  console.log('[CORS DEBUG] Origin:', req.headers.origin);
-  next();
-});
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -105,17 +102,24 @@ async function startServer() {
   try {
     if (typeof initDB === 'function') {
       await initDB();
-      console.log('✅ Tabelas do Banco de Dados verificadas/criadas antes do boot.');
+      if (!isProduction) {
+        console.log('✅ Tabelas do Banco de Dados verificadas/criadas antes do boot.');
+      }
     }
   } catch (error) {
-    console.error('⚠️ Aviso: Inicialização automática do banco falhou. Use /api/system-check para diagnosticar.');
+    console.error('⚠️ Inicialização automática do banco falhou.');
     console.error(error.message);
+    if (isProduction) {
+      process.exit(1);
+    }
   }
 
   app.listen(PORT, () => {
-    console.log(`🚀 Backend server running on http://localhost:${PORT}`);
-    console.log(`📊 Database: MySQL`);
-    console.log(`🔐 JWT Authentication enabled`);
+    if (!isProduction) {
+      console.log(`🚀 Backend server running on http://localhost:${PORT}`);
+      console.log(`📊 Database: MySQL`);
+      console.log(`🔐 JWT Authentication enabled`);
+    }
   });
 }
 

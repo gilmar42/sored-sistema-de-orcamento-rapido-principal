@@ -16,6 +16,7 @@ const {
 } = require('../services/authFallbackStore.cjs');
 const crypto = require('crypto');
 const { sendWelcomeEmail } = require('../services/emailService');
+const isProduction = process.env.NODE_ENV === 'production';
 
 const router = express.Router();
 
@@ -36,6 +37,10 @@ function blockedPayload(access) {
     accessStatus: access.accessStatus,
     trialEndsAt: access.trialEndsAt,
   };
+}
+
+function canUseFallbackAuth(error) {
+  return !isProduction && isDatabaseUnavailable(error);
 }
 
 async function handleFallbackSignup(req, res) {
@@ -193,7 +198,7 @@ router.post('/signup', async (req, res) => {
       access,
     });
   } catch (error) {
-    if (isDatabaseUnavailable(error)) {
+    if (canUseFallbackAuth(error)) {
       try {
         return await handleFallbackSignup(req, res);
       } catch (fallbackError) {
@@ -254,7 +259,7 @@ router.post('/login', async (req, res) => {
       access,
     });
   } catch (error) {
-    if (isDatabaseUnavailable(error)) {
+    if (canUseFallbackAuth(error)) {
       try {
         return await handleFallbackLogin(req, res);
       } catch (fallbackError) {
@@ -279,7 +284,7 @@ router.get('/verify', async (req, res) => {
     try {
       access = await reconcileUserAccess(decoded.userId);
     } catch (error) {
-      if (!isDatabaseUnavailable(error)) {
+      if (!canUseFallbackAuth(error)) {
         throw error;
       }
       access = await reconcileFallbackAccess(decoded.userId);
@@ -326,7 +331,7 @@ router.post('/refresh', async (req, res) => {
       res.cookie('token', newToken, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 });
       res.json({ user: { id: user.id, email: user.email, tenantId: user.tenant_id }, access });
     } catch (error) {
-      if (!isDatabaseUnavailable(error)) {
+      if (!canUseFallbackAuth(error)) {
         throw error;
       }
 

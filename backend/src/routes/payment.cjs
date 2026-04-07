@@ -7,6 +7,7 @@ const { setUserAccessStatus } = require('../services/accessControl.cjs');
 const dotenv = require('dotenv');
 
 dotenv.config();
+const isProduction = process.env.NODE_ENV === 'production';
 
 // Inicialização Preguiçosa do SDK Mercado Pago
 let mpConfig = null;
@@ -34,12 +35,13 @@ const planConfig = {
 // Utilitário para criar plano no Mercado Pago
 async function createMPPlan({ planType, price, frequency, frequencyType }) {
   // Mercado Pago v2 (PreApproval) requires an HTTPS back_url.
-  // We'll try to use the configured URL, but force HTTPS if possible, or use a valid placeholder.
   let successUrl = process.env.MP_SUCCESS_URL || '';
   
   if (!successUrl || successUrl.includes('localhost')) {
-    // Falls back to the production frontend URL configured for Hostinger.
-    const baseFrontendUrl = process.env.FRONTEND_URL_PRODUCTION || process.env.FRONTEND_URL || '';
+    const baseFrontendUrl = process.env.FRONTEND_URL_PRODUCTION || process.env.FRONTEND_URL || (isProduction ? '' : 'http://localhost:5173');
+    if (!baseFrontendUrl) {
+      throw new Error('FRONTEND_URL_PRODUCTION não está configurada para produção');
+    }
     successUrl = `${baseFrontendUrl}/sucesso`;
   }
 
@@ -253,7 +255,10 @@ router.post('/subscriptions', async (req, res) => {
       const [uNewRows] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
       user = uNewRows[0];
     }
-    const baseFrontendUrl = process.env.FRONTEND_URL_PRODUCTION || process.env.FRONTEND_URL || 'http://localhost:5173';
+    const baseFrontendUrl = process.env.FRONTEND_URL_PRODUCTION || process.env.FRONTEND_URL || (isProduction ? '' : 'http://localhost:5173');
+    if (!baseFrontendUrl) {
+      throw new Error('FRONTEND_URL_PRODUCTION não está configurada para produção');
+    }
     const successUrl = process.env.MP_SUCCESS_URL || `${baseFrontendUrl}/sucesso`;
 
     // Cria assinatura no Mercado Pago
@@ -318,7 +323,9 @@ router.post('/webhooks', async (req, res) => {
       payload = rawBody;
     }
 
-    console.log('[Webhook] Recebido MP Notificação:', payload.type, 'Action:', payload.action);
+    if (!isProduction) {
+      console.log('[Webhook] Recebido MP Notificação:', payload.type, 'Action:', payload.action);
+    }
 
     if (payload.type !== 'preapproval' && payload.action !== 'payment.created' && payload.action !== 'payment.updated') {
       return res.status(200).send('ignorado');
