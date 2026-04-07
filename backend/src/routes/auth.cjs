@@ -40,7 +40,7 @@ function blockedPayload(access) {
 }
 
 function canUseFallbackAuth(error) {
-  return !isProduction && isDatabaseUnavailable(error);
+  return isDatabaseUnavailable(error);
 }
 
 async function handleFallbackSignup(req, res) {
@@ -208,9 +208,6 @@ router.post('/signup', async (req, res) => {
     if (error && error.code === 'DEMO_ACCOUNT') {
       return res.status(400).json({ error: 'Demo accounts are not allowed in production' });
     }
-    if (isProduction && isDatabaseUnavailable(error)) {
-      return res.status(503).json({ error: 'Database unavailable' });
-    }
     if (canUseFallbackAuth(error)) {
       try {
         return await handleFallbackSignup(req, res);
@@ -277,9 +274,6 @@ router.post('/login', async (req, res) => {
   } catch (error) {
     if (error && error.code === 'DEMO_ACCOUNT') {
       return res.status(400).json({ error: 'Demo accounts are not allowed in production' });
-    }
-    if (isProduction && isDatabaseUnavailable(error)) {
-      return res.status(503).json({ error: 'Database unavailable' });
     }
     if (canUseFallbackAuth(error)) {
       try {
