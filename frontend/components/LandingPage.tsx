@@ -55,6 +55,25 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, paymentS
 
   return (
     <div className="min-h-screen bg-linear-to-br from-ice-50 via-white to-blue-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+      <div className="border-b border-blue-200/70 bg-blue-950 px-4 py-3 text-white shadow-lg shadow-blue-950/20 dark:border-blue-900/60">
+        <div className="mx-auto flex max-w-7xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:px-2">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-yellow-300">
+              <SparklesIcon className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.25em] text-blue-200">Teste grátis de 5 dias</p>
+              <p className="text-sm text-blue-50/90">
+                Acesso completo e ilimitado, com cobrança automática ao final do período e cancelamento antes do vencimento.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-sm font-semibold text-emerald-200">
+            <CheckCircleIcon className="h-5 w-5" />
+            Risco zero para começar
+          </div>
+        </div>
+      </div>
       {/* Hero Banner */}
       <div className="relative overflow-hidden bg-linear-to-r from-blue-600 via-blue-700 to-blue-800 dark:from-blue-900 dark:via-blue-800 dark:to-slate-900">
         <div className="absolute inset-0 bg-grid-pattern opacity-10"></div>

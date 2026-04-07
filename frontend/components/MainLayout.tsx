@@ -7,7 +7,6 @@ import { SavedQuotes } from './SavedQuotes';
 import { LandingPage } from './LandingPage';
 import { HourlyQuote } from './HourlyQuote';
 import { MachineHourQuote } from './MachineHourQuote';
-import TrialStatusBanner from './TrialStatusBanner';
 import type { Quote } from '../types';
 import { SoredIcon, CalculatorIcon, BoxIcon, CogIcon, DocumentTextIcon, ArrowLeftOnRectangleIcon, SunIcon, MoonIcon, UserGroupIcon, HomeIcon, ClockIcon } from './Icons';
 import { useAuth } from './../context/AuthContext';
@@ -158,7 +157,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ initialView, onOpenPlans }) => 
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-24 md:pb-8 transition-all duration-500 ease-in-out transform" data-testid="main-view-container">
           <div className="animate-fade-in-up">
-            <TrialStatusBanner onOpenPlans={onOpenPlans} />
             {renderView()}
           </div>
         </main>
