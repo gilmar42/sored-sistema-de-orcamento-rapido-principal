@@ -21,7 +21,7 @@ const authMiddleware = async (req, res, next) => {
     try {
       access = await reconcileUserAccess(decoded.userId);
     } catch (error) {
-      if (isProduction || !isDatabaseUnavailable(error)) {
+      if (!isDatabaseUnavailable(error)) {
         throw error;
       }
       access = await reconcileFallbackAccess(decoded.userId);

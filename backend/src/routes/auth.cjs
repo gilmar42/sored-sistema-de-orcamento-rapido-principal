@@ -40,7 +40,7 @@ function blockedPayload(access) {
 }
 
 function canUseFallbackAuth(error) {
-  return !isProduction && isDatabaseUnavailable(error);
+  return isDatabaseUnavailable(error);
 }
 
 async function handleFallbackSignup(req, res) {
