@@ -9,6 +9,7 @@ const fs = require('fs');
 
 // Importa e inicializa imediatamente a API (Backend)
 const app = require('./backend/src/app.cjs');
+const { initDB } = require('./backend/src/config/database_utils.cjs');
 
 // Configura o servidor Express (que já está rodando a API) para TAMBÉM servir o Frontend
 
@@ -84,21 +85,22 @@ app.use((req, res, next) => {
 
 // Inicia o servidor unificado
 const PORT = process.env.PORT || 9000;
-app.listen(PORT, async () => {
-    console.log(`🚀 Unified Server running on http://localhost:${PORT}`);
-    console.log(`✅ Server.js carregado: Unificando Backend e Frontend na mesma porta para deploy!`);
 
-    // Tenta inicializar o banco de dados (sem travar o servidor)
+async function startServer() {
     try {
-        const db = require('./backend/src/config/database');
-        // Chamamos a inicialização que criará as tabelas se não existirem
-        const { initDB } = require('./backend/src/config/database_utils.cjs'); // Verifiquei que este arquivo existe
         if (typeof initDB === 'function') {
             await initDB();
-            console.log('✅ Tabelas do Banco de Dados verificadas/criadas.');
+            console.log('✅ Tabelas do Banco de Dados verificadas/criadas antes do boot.');
         }
     } catch (e) {
         console.error('⚠️ Aviso: Inicialização automática do banco falhou. Use /api/system-check para diagnosticar.');
         console.error(e.message);
     }
-});
+
+    app.listen(PORT, () => {
+        console.log(`🚀 Unified Server running on http://localhost:${PORT}`);
+        console.log(`✅ Server.js carregado: Unificando Backend e Frontend na mesma porta para deploy!`);
+    });
+}
+
+startServer();
