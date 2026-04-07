@@ -38,8 +38,8 @@ async function createMPPlan({ planType, price, frequency, frequencyType }) {
   let successUrl = process.env.MP_SUCCESS_URL || '';
   
   if (!successUrl || successUrl.includes('localhost')) {
-    // Falls back to a valid HTTPS URL if localhost is detected, as MP often rejects it for Plans.
-    const baseFrontendUrl = process.env.FRONTEND_URL_PRODUCTION || 'https://projeto-sored.vercel.app';
+    // Falls back to the production frontend URL configured for Hostinger.
+    const baseFrontendUrl = process.env.FRONTEND_URL_PRODUCTION || process.env.FRONTEND_URL || '';
     successUrl = `${baseFrontendUrl}/sucesso`;
   }
 

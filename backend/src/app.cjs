@@ -31,7 +31,6 @@ const defaultOrigins = [
   'http://192.168.0.104:3001',
   'http://192.168.0.104:3007',
   'http://192.168.0.104:5173',
-  'https://sord-sistema-de-or-amento-rapido-pr-seven.vercel.app',
 ];
 
 const envOrigins = [process.env.FRONTEND_URL, process.env.FRONTEND_URL_PRODUCTION].filter(Boolean);
