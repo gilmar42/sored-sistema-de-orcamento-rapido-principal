@@ -10,6 +10,7 @@ import { AuthPage } from './components/auth/AuthPage';
 import { LandingPage } from './components/LandingPage';
 import PlansModal from './components/PlansModal';
 import TrialPaywall from './components/TrialPaywall';
+import TrialStatusBanner from './components/TrialStatusBanner';
 
 const AppContent: React.FC = () => {
   const { toasts, removeToast } = useToast();
@@ -84,13 +85,21 @@ const AppContent: React.FC = () => {
   // Usuário autenticado: exibir landing de boas-vindas antes de entrar no layout
   if (showLandingAfterLogin) {
     return (
-      <LandingPage
-        onGetStarted={() => {
-          setNextView('calculator');
-          setShowLandingAfterLogin(false);
-        }}
-        paymentStatus={paymentStatus}
-      />
+      <>
+        <div className="min-h-screen bg-ice-50 dark:bg-slate-900">
+          <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+            <TrialStatusBanner onOpenPlans={() => setShowPlans(true)} />
+          </div>
+          <LandingPage
+            onGetStarted={() => {
+              setNextView('calculator');
+              setShowLandingAfterLogin(false);
+            }}
+            paymentStatus={paymentStatus}
+          />
+        </div>
+        <PlansModal open={showPlans} onClose={() => setShowPlans(false)} prefillEmail={currentUser?.email ?? ''} />
+      </>
     );
   }
 
