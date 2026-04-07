@@ -23,6 +23,8 @@ const cookieOptions = {
   secure: isProduction,
   path: '/',
 };
+const DEMO_EMAIL_SUFFIX = '@sored.demo';
+const DEMO_COMPANY_NAMES = new Set(['Empresa Demo', 'Debug Teste']);
 
 const router = express.Router();
 
@@ -34,6 +36,30 @@ function generateRefreshToken() {
 function issueSession(res, token, refreshToken) {
   res.cookie('token', token, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 });
   res.cookie('refreshToken', refreshToken, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
+}
+
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+function normalizeCompanyName(companyName) {
+  return String(companyName || '').trim();
+}
+
+function isDatabaseUnavailableError(error) {
+  const message = String(error?.message || '');
+  return (
+    error?.code === 'ECONNREFUSED' ||
+    error?.code === 'ENOTFOUND' ||
+    error?.code === 'ETIMEDOUT' ||
+    error?.code === 'EHOSTUNREACH' ||
+    error?.errno === -111 ||
+    /connect ECONNREFUSED|can't connect to mysql server|server has gone away|lost connection to mysql server|er_bad_db_error|er_access_denied_error/i.test(message)
+  );
+}
+
+function isDemoSignup(email, companyName) {
+  return normalizeEmail(email).endsWith(DEMO_EMAIL_SUFFIX) || DEMO_COMPANY_NAMES.has(normalizeCompanyName(companyName));
 }
 
 function buildUserResponse(user) {
@@ -54,18 +80,20 @@ function blockedPayload(access) {
 }
 
 function canUseFallbackAuth(error) {
-  return isDatabaseUnavailable(error);
+  return isDatabaseUnavailable(error) || isDatabaseUnavailableError(error);
 }
 
 async function handleFallbackSignup(req, res) {
   const { companyName, email, password } = req.body;
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedCompanyName = normalizeCompanyName(companyName);
   try {
     const passwordHash = await bcrypt.hash(password, 10);
-    const created = await createTenantUserAndTrial(companyName, email, passwordHash);
+    const created = await createTenantUserAndTrial(normalizedCompanyName, normalizedEmail, passwordHash);
 
     sendWelcomeEmail({
-      to: email,
-      companyName,
+      to: normalizedEmail,
+      companyName: normalizedCompanyName,
       tenantId: created.tenantId,
       userId: created.userId,
     }).catch((err) => console.error('Failed to send welcome email:', err));
@@ -75,7 +103,7 @@ async function handleFallbackSignup(req, res) {
       return res.status(403).json(blockedPayload(access));
     }
 
-    const token = jwt.sign({ userId: created.userId, email, tenantId: created.tenantId }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: created.userId, email: normalizedEmail, tenantId: created.tenantId }, JWT_SECRET, { expiresIn: '7d' });
     const refreshToken = generateRefreshToken();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
     await storeRefreshToken(created.userId, refreshToken, expiresAt);
@@ -84,7 +112,7 @@ async function handleFallbackSignup(req, res) {
     return res.json({
       user: {
         id: created.userId,
-        email,
+        email: normalizedEmail,
         tenantId: created.tenantId,
       },
       access,
@@ -99,7 +127,7 @@ async function handleFallbackSignup(req, res) {
 
 async function handleFallbackLogin(req, res) {
   const { email, password } = req.body;
-  const user = await findUserByEmail(email);
+  const user = await findUserByEmail(normalizeEmail(email));
   if (!user) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
@@ -134,27 +162,33 @@ async function handleFallbackLogin(req, res) {
 router.post('/signup', async (req, res) => {
   try {
     const { companyName, email, password } = req.body;
+    const normalizedEmail = normalizeEmail(email);
+    const normalizedCompanyName = normalizeCompanyName(companyName);
 
-    if (!companyName || !email || !password) {
+    if (!normalizedCompanyName || !normalizedEmail || !password) {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
+    if (isProduction && isDemoSignup(normalizedEmail, normalizedCompanyName)) {
+      return res.status(400).json({ error: 'Demo accounts are not allowed in production' });
+    }
+
     // Check if user exists
-    const [existingUsers] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+    const [existingUsers] = await db.query('SELECT * FROM users WHERE LOWER(TRIM(email)) = ?', [normalizedEmail]);
     if (existingUsers.length > 0) {
       return res.status(400).json({ error: 'User already exists' });
     }
 
     // Create tenant
     const tenantId = `T-${Date.now()}`;
-    await db.query('INSERT INTO tenants (id, company_name) VALUES (?, ?)', [tenantId, companyName]);
+    await db.query('INSERT INTO tenants (id, company_name) VALUES (?, ?)', [tenantId, normalizedCompanyName]);
 
     // Create user
     const userId = `U-${Date.now()}`;
     const passwordHash = await bcrypt.hash(password, 10);
     await db.query('INSERT INTO users (id, email, password_hash, tenant_id) VALUES (?, ?, ?, ?)', [
       userId,
-      email,
+      normalizedEmail,
       passwordHash,
       tenantId
     ]);
@@ -173,7 +207,7 @@ router.post('/signup', async (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?)
     `, [
       `S-${Date.now()}`,
-      companyName,
+      normalizedCompanyName,
       '',
       '',
       0,
@@ -184,8 +218,8 @@ router.post('/signup', async (req, res) => {
 
     // Send welcome email with tenant ID and user ID
     sendWelcomeEmail({
-      to: email,
-      companyName,
+      to: normalizedEmail,
+      companyName: normalizedCompanyName,
       tenantId,
       userId,
     }).catch((err) => console.error('Failed to send welcome email:', err));
@@ -201,7 +235,7 @@ router.post('/signup', async (req, res) => {
     }
 
     // Generate tokens
-    const token = jwt.sign({ userId, email, tenantId }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId, email: normalizedEmail, tenantId }, JWT_SECRET, { expiresIn: '7d' });
     const refreshToken = generateRefreshToken();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' '); // 30 dias MYSQL DATETIME format
     await db.query('INSERT INTO refresh_tokens (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)', [
@@ -213,7 +247,7 @@ router.post('/signup', async (req, res) => {
     res.json({
       user: {
         id: userId,
-        email,
+        email: normalizedEmail,
         tenantId,
       },
       access,
@@ -230,10 +264,16 @@ router.post('/signup', async (req, res) => {
           return res.status(400).json({ error: 'User already exists' });
         }
         console.error('Fallback signup error:', fallbackError);
+        if (isDatabaseUnavailableError(error) || isDatabaseUnavailableError(fallbackError)) {
+          return res.status(503).json({ error: 'Banco de dados indisponível. Tente novamente em instantes.' });
+        }
         return res.status(500).json({ error: 'Internal server error' });
       }
     }
     console.error('Signup error:', error);
+    if (isDatabaseUnavailableError(error)) {
+      return res.status(503).json({ error: 'Banco de dados indisponível. Tente novamente em instantes.' });
+    }
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -242,10 +282,11 @@ router.post('/signup', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
-    const [users] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+    const [users] = await db.query('SELECT * FROM users WHERE LOWER(TRIM(email)) = ?', [normalizedEmail]);
     const user = users[0];
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
@@ -266,7 +307,7 @@ router.post('/login', async (req, res) => {
     }
 
     const token = jwt.sign(
-      { userId: user.id, email: user.email, tenantId: user.tenant_id },
+      { userId: user.id, email: normalizeEmail(user.email), tenantId: user.tenant_id },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -280,7 +321,7 @@ router.post('/login', async (req, res) => {
     return res.status(200).json({
       user: {
         id: user.id,
-        email: user.email,
+        email: normalizeEmail(user.email),
         tenantId: user.tenant_id,
       },
       access,
@@ -297,10 +338,16 @@ router.post('/login', async (req, res) => {
           return res.status(401).json({ error: 'Invalid credentials' });
         }
         console.error('Fallback login error:', fallbackError);
+        if (isDatabaseUnavailableError(error) || isDatabaseUnavailableError(fallbackError)) {
+          return res.status(503).json({ error: 'Banco de dados indisponível. Tente novamente em instantes.' });
+        }
         return res.status(500).json({ error: 'Internal server error' });
       }
     }
     console.error('Login error:', error);
+    if (isDatabaseUnavailableError(error)) {
+      return res.status(503).json({ error: 'Banco de dados indisponível. Tente novamente em instantes.' });
+    }
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

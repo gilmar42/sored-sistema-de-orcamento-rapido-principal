@@ -147,7 +147,8 @@ async function createTenantUserAndTrial(companyName, email, passwordHash) {
     error.code = 'DEMO_ACCOUNT';
     throw error;
   }
-  const existingUser = state.users.find((user) => user.email.toLowerCase() === email.toLowerCase());
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const existingUser = state.users.find((user) => String(user.email).trim().toLowerCase() === normalizedEmail);
   if (existingUser) {
     const error = new Error('User already exists');
     error.code = 'USER_EXISTS';
@@ -166,7 +167,7 @@ async function createTenantUserAndTrial(companyName, email, passwordHash) {
 
   state.users.push({
     id: userId,
-    email,
+    email: normalizedEmail,
     passwordHash,
     tenantId,
     tenant_id: tenantId,
@@ -190,7 +191,8 @@ async function createTenantUserAndTrial(companyName, email, passwordHash) {
 
 async function findUserByEmail(email) {
   const state = await loadState();
-  return normalizeUserRecord(state.users.find((user) => user.email.toLowerCase() === email.toLowerCase()) || null);
+  const normalizedEmail = String(email).trim().toLowerCase();
+  return normalizeUserRecord(state.users.find((user) => String(user.email).trim().toLowerCase() === normalizedEmail) || null);
 }
 
 async function findUserById(userId) {
