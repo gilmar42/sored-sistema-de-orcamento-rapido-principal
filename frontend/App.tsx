@@ -57,7 +57,7 @@ const AppContent: React.FC = () => {
               setShowAuth(true);
             }}
           />
-          <PlansModal open={showPlans} onClose={() => setShowPlans(false)} />
+          <PlansModal open={showPlans} onClose={() => setShowPlans(false)} prefillEmail={currentUser?.email ?? ''} />
         </>
       );
     }
@@ -76,7 +76,7 @@ const AppContent: React.FC = () => {
             paymentStatus={paymentStatus}
           />
         )}
-        <PlansModal open={showPlans} onClose={() => setShowPlans(false)} />
+        <PlansModal open={showPlans} onClose={() => setShowPlans(false)} prefillEmail={currentUser?.email ?? ''} />
       </>
     );
   }
@@ -96,7 +96,7 @@ const AppContent: React.FC = () => {
 
   return (
     <DataProvider>
-      <MainLayout initialView={nextView} />
+      <MainLayout initialView={nextView} onOpenPlans={() => setShowPlans(true)} />
       <ToastContainer toasts={toasts} onCloseToast={removeToast} />
     </DataProvider>
   );

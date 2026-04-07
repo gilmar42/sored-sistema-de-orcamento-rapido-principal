@@ -32,6 +32,10 @@ const planConfig = {
   annual: { amount: 1100, description: 'Plano Anual SORED' },
 };
 
+function getPlanDurationMs(planType) {
+  return planType === 'annual' ? 365 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+}
+
 // Utilitário para criar plano no Mercado Pago
 async function createMPPlan({ planType, price, frequency, frequencyType }) {
   // Mercado Pago v2 (PreApproval) requires an HTTPS back_url.
@@ -74,6 +78,74 @@ function formatDT(d) {
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return null;
   return dt.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+async function activatePixAccess(paymentId, paymentDetails = null) {
+  const paymentKey = String(paymentId);
+  const [paymentRows] = await db.query('SELECT * FROM payments WHERE mp_payment_id = ? LIMIT 1', [paymentKey]);
+  const payment = paymentRows[0];
+  if (!payment) {
+    return null;
+  }
+
+  const planType = payment.plan_type || paymentDetails?.planType || 'monthly';
+  const nextBilling = formatDT(new Date(Date.now() + getPlanDurationMs(planType)));
+  const subscriptionKey = `pix:${paymentKey}`;
+  const payerEmail = payment.payer_email || paymentDetails?.payerEmail || null;
+
+  let user = null;
+  if (payerEmail) {
+    const [userRows] = await db.query('SELECT * FROM users WHERE email = ? LIMIT 1', [payerEmail]);
+    user = userRows[0] || null;
+  }
+
+  if (!user && payerEmail) {
+    const bcrypt = require('bcryptjs');
+    const tenantId = `T-${Date.now()}`;
+    const userId = `U-${Date.now()}`;
+    const passwordHash = await bcrypt.hash(uuidv4(), 10);
+
+    await db.query('INSERT INTO tenants (id, company_name) VALUES (?, ?)', [tenantId, 'Empresa Pagante']);
+    await db.query('INSERT INTO users (id, email, password_hash, tenant_id, access_status) VALUES (?, ?, ?, ?, ?)', [
+      userId,
+      payerEmail,
+      passwordHash,
+      tenantId,
+      'paid',
+    ]);
+    user = { id: userId };
+  }
+
+  if (user) {
+    await setUserAccessStatus(user.id, 'paid');
+
+    const [existingSubscriptions] = await db.query(
+      'SELECT id FROM subscriptions WHERE mpSubscriptionId = ? LIMIT 1',
+      [subscriptionKey]
+    );
+
+    if (existingSubscriptions[0]) {
+      await db.query(
+        'UPDATE subscriptions SET status = ?, planType = ?, nextBilling = ?, gracePeriodUntil = NULL WHERE mpSubscriptionId = ?',
+        ['paid', planType, nextBilling, subscriptionKey]
+      );
+    } else {
+      await db.query(
+        'INSERT INTO subscriptions (userId, mpSubscriptionId, status, planType, nextBilling) VALUES (?, ?, ?, ?, ?)',
+        [user.id, subscriptionKey, 'paid', planType, nextBilling]
+      );
+    }
+  }
+
+  await db.query('UPDATE payments SET status = ? WHERE mp_payment_id = ?', ['approved', paymentKey]);
+
+  return {
+    paymentId: paymentKey,
+    planType,
+    nextBilling,
+    payerEmail,
+    userId: user?.id || null,
+  };
 }
 
 // GET /plans: Retorna os planos existentes no banco
@@ -219,6 +291,12 @@ router.get('/pix/status/:paymentId', async (req, res) => {
     const result = await mpPayment.get({ id: paymentId });
     if (result?.status) {
       await db.query('UPDATE payments SET status = ? WHERE mp_payment_id = ?', [result.status, paymentId]);
+      if (result.status === 'approved') {
+        await activatePixAccess(paymentId, {
+          planType: req.query.planType || null,
+          payerEmail: req.query.email || null,
+        });
+      }
     }
     return res.json({
       paymentId,
@@ -380,6 +458,11 @@ router.post('/webhooks', async (req, res) => {
         const result = await mpPayment.get({ id: paymentId });
         if (result?.status) {
           await db.query('UPDATE payments SET status = ? WHERE mp_payment_id = ?', [result.status, paymentId]);
+          if (result.status === 'approved') {
+            await activatePixAccess(paymentId, {
+              payerEmail: result.payer?.email || null,
+            });
+          }
         }
       }
     }

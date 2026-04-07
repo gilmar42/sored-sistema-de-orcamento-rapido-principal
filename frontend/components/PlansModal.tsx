@@ -5,6 +5,7 @@ import SubscriptionModal from './SubscriptionModal';
 interface PlansModalProps {
   open: boolean;
   onClose: () => void;
+  prefillEmail?: string;
 }
 
 interface Plan {
@@ -16,7 +17,7 @@ interface Plan {
   popular?: boolean;
 }
 
-const PlansModal: React.FC<PlansModalProps> = ({ open, onClose }) => {
+const PlansModal: React.FC<PlansModalProps> = ({ open, onClose, prefillEmail = '' }) => {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,8 +67,11 @@ const PlansModal: React.FC<PlansModalProps> = ({ open, onClose }) => {
   useEffect(() => {
     if (open) {
       loadPlans();
+      if (prefillEmail) {
+        setPixEmail(prefillEmail);
+      }
     }
-  }, [open]);
+  }, [open, prefillEmail]);
 
   const loadPlans = async () => {
     setLoading(true);
@@ -134,7 +138,7 @@ const PlansModal: React.FC<PlansModalProps> = ({ open, onClose }) => {
     try {
       const status = await getPixPaymentStatus(pixData.paymentId);
       if (status.status === 'approved') {
-        window.location.href = `${window.location.pathname}?payment=success`;
+        window.location.replace(window.location.pathname);
         return;
       }
       if (status.status === 'pending' || status.status === 'in_process') {

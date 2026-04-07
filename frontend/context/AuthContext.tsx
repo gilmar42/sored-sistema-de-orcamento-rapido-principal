@@ -5,6 +5,15 @@ import type { ReactNode } from 'react';
 import type { User } from '../types';
 import { apiService } from '../services/api';
 
+type AccessStatus = 'trial' | 'paid' | 'grace' | 'blocked' | null;
+
+interface AccessState {
+  accessStatus: AccessStatus;
+  trialStartedAt: string | null;
+  trialEndsAt: string | null;
+  blockReason: string | null;
+}
+
 interface AuthContextType {
   currentUser: User | null;
   tenantId: string | null;
@@ -14,6 +23,10 @@ interface AuthContextType {
   clearAuthError: () => void;
   isLoading: boolean;
   authError: string | null;
+  accessStatus: AccessStatus;
+  trialStartedAt: string | null;
+  trialEndsAt: string | null;
+  blockReason: string | null;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,6 +35,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [access, setAccess] = useState<AccessState>({
+    accessStatus: null,
+    trialStartedAt: null,
+    trialEndsAt: null,
+    blockReason: null,
+  });
+
+  const applyAccess = (nextAccess: any) => {
+    setAccess({
+      accessStatus: nextAccess?.accessStatus ?? null,
+      trialStartedAt: nextAccess?.trialStartedAt ?? null,
+      trialEndsAt: nextAccess?.trialEndsAt ?? null,
+      blockReason: nextAccess?.blockReason ?? null,
+    });
+  };
 
 
   // Checa sessão no backend ao montar
@@ -31,6 +59,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const data = await apiService.verifyToken();
         if (data && data.user) {
           setAuthError(null);
+          applyAccess(data.access);
           setCurrentUser({
             id: data.user.id,
             email: data.user.email,
@@ -39,9 +68,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           });
         } else {
           setCurrentUser(null);
+          applyAccess(null);
         }
       } catch (error) {
         setCurrentUser(null);
+        applyAccess(null);
         if (error instanceof Error) {
           setAuthError(error.message);
         }
@@ -59,6 +90,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const data = await apiService.login(email, password);
       if (data && data.user) {
         setAuthError(null);
+        applyAccess(data.access);
         setCurrentUser({
           id: data.user.id,
           email: data.user.email,
@@ -83,6 +115,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const data = await apiService.signup(companyName, email, password);
       if (data && data.user) {
         setAuthError(null);
+        applyAccess(data.access);
         setCurrentUser({
           id: data.user.id,
           email: data.user.email,
@@ -107,6 +140,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch {}
     setCurrentUser(null);
     setAuthError(null);
+    applyAccess(null);
   };
 
   const clearAuthError = () => {
@@ -115,7 +149,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 
   return (
-    <AuthContext.Provider value={{ currentUser, tenantId: currentUser?.tenantId ?? null, login, logout, signup, clearAuthError, isLoading, authError }}>
+    <AuthContext.Provider value={{
+      currentUser,
+      tenantId: currentUser?.tenantId ?? null,
+      login,
+      logout,
+      signup,
+      clearAuthError,
+      isLoading,
+      authError,
+      accessStatus: access.accessStatus,
+      trialStartedAt: access.trialStartedAt,
+      trialEndsAt: access.trialEndsAt,
+      blockReason: access.blockReason,
+    }}>
       {children}
     </AuthContext.Provider>
   );
