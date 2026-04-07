@@ -16,12 +16,12 @@ export const createSubscription = jest
 
 export const createPixPayment = jest
   .fn()
-  .mockImplementation(({ email, planType }: { email: string; planType: 'monthly' | 'annual' }) => ({
+  .mockImplementation(({ email, planType, expiresAt }: { email: string; planType: 'monthly' | 'annual'; expiresAt?: string | null }) => ({
     paymentId: 'mock-payment-id',
     status: 'pending',
     qrCode: 'mock-qr-code',
     qrCodeBase64: 'data:image/png;base64,mock',
-    expiresAt: new Date(Date.now() + 3600000).toISOString(),
+    expiresAt: expiresAt || new Date(Date.now() + 3600000).toISOString(),
     email,
     planType,
   }));

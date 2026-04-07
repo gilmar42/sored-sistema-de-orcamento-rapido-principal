@@ -5,6 +5,13 @@ import * as paymentService from '../services/paymentService';
 
 // Mock do serviço de pagamento
 jest.mock('../services/paymentService');
+jest.mock('../context/AuthContext', () => ({
+  useAuth: () => ({
+    currentUser: { id: 'U-1', email: 'test@example.com', tenantId: 'T-1' },
+    accessStatus: 'trial',
+    trialEndsAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+  }),
+}));
 
 describe('PlansModal', () => {
   beforeEach(() => {

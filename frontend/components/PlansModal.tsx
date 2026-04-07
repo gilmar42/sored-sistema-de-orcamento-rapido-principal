@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getPlans, createPixPayment, getPixPaymentStatus } from '../services/paymentService';
 import SubscriptionModal from './SubscriptionModal';
+import { useAuth } from '../context/AuthContext';
 
 interface PlansModalProps {
   open: boolean;
@@ -18,6 +19,7 @@ interface Plan {
 }
 
 const PlansModal: React.FC<PlansModalProps> = ({ open, onClose, prefillEmail = '' }) => {
+  const { currentUser, accessStatus, trialEndsAt } = useAuth();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -122,7 +124,12 @@ const PlansModal: React.FC<PlansModalProps> = ({ open, onClose, prefillEmail = '
     setPixLoading(true);
     setPixError(null);
     try {
-      const result = await createPixPayment({ email: pixEmail, planType: pixPlan });
+      const trialExpiration = accessStatus === 'trial' ? trialEndsAt : null;
+      const result = await createPixPayment({
+        email: pixEmail,
+        planType: pixPlan,
+        expiresAt: trialExpiration,
+      });
       setPixData(result);
     } catch (err: any) {
       setPixError(err?.message || 'Erro ao gerar Pix.');
@@ -327,6 +334,12 @@ const PlansModal: React.FC<PlansModalProps> = ({ open, onClose, prefillEmail = '
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               Plano selecionado: {pixPlan === 'annual' ? 'Anual' : 'Mensal'}
             </p>
+            {accessStatus === 'trial' && trialEndsAt && (
+              <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200">
+                Este Pix foi alinhado ao seu teste grátis e pode ser pago antes ou no fim do período.
+                Se não houver aprovação, o acesso será bloqueado automaticamente ao encerrar o trial.
+              </div>
+            )}
 
             <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2" htmlFor="pix-email">
               E-mail para o Pix
@@ -338,6 +351,7 @@ const PlansModal: React.FC<PlansModalProps> = ({ open, onClose, prefillEmail = '
               onChange={(e) => setPixEmail(e.target.value)}
               className="w-full mb-3 p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               placeholder="seu@email.com"
+              readOnly={Boolean(currentUser?.email)}
             />
 
             <button
@@ -345,7 +359,7 @@ const PlansModal: React.FC<PlansModalProps> = ({ open, onClose, prefillEmail = '
               disabled={pixLoading}
               className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded font-semibold disabled:opacity-60"
             >
-              {pixLoading ? 'Gerando Pix...' : 'Gerar Pix'}
+              {pixLoading ? 'Gerando Pix...' : accessStatus === 'trial' ? 'Gerar Pix do teste' : 'Gerar Pix'}
             </button>
 
             {pixData?.qrCodeBase64 && (

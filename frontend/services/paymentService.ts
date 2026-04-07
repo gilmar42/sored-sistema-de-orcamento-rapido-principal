@@ -14,8 +14,8 @@ export async function createSubscription({ email, token, planType }: { email: st
   return data;
 }
 
-export async function createPixPayment({ email, planType }: { email: string; planType: 'monthly' | 'annual' }) {
-  const { data } = await axios.post(`${API}/pix`, { email, planType });
+export async function createPixPayment({ email, planType, expiresAt }: { email: string; planType: 'monthly' | 'annual'; expiresAt?: string | null }) {
+  const { data } = await axios.post(`${API}/pix`, { email, planType, expiresAt });
   return data as { paymentId: string; status: string; qrCode: string | null; qrCodeBase64: string | null; expiresAt?: string | null };
 }
 

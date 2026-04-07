@@ -80,6 +80,23 @@ function formatDT(d) {
   return dt.toISOString().slice(0, 19).replace('T', ' ');
 }
 
+function parsePixExpiration(expiresAt) {
+  if (!expiresAt) return null;
+  const dt = new Date(expiresAt);
+  if (Number.isNaN(dt.getTime())) return null;
+
+  const now = Date.now();
+  const minMs = 30 * 60 * 1000;
+  const maxMs = 30 * 24 * 60 * 60 * 1000;
+  const diff = dt.getTime() - now;
+
+  if (diff < minMs || diff > maxMs) {
+    return null;
+  }
+
+  return dt.toISOString();
+}
+
 async function activatePixAccess(paymentId, paymentDetails = null) {
   const paymentKey = String(paymentId);
   const [paymentRows] = await db.query('SELECT * FROM payments WHERE mp_payment_id = ? LIMIT 1', [paymentKey]);
@@ -224,7 +241,7 @@ router.post('/plans', async (req, res) => {
 // POST /pix: Cria pagamento PIX para um plano
 router.post('/pix', async (req, res) => {
   try {
-    const { email, planType } = req.body;
+    const { email, planType, expiresAt } = req.body;
     if (!email || !planType) {
       return res.status(400).json({ error: 'email e planType são obrigatórios' });
     }
@@ -242,6 +259,11 @@ router.post('/pix', async (req, res) => {
       payer: { email },
     };
 
+    const deferredExpiration = parsePixExpiration(expiresAt);
+    if (deferredExpiration) {
+      body.date_of_expiration = deferredExpiration;
+    }
+
     const { mpPayment } = getMP();
     const result = await mpPayment.create({ body, requestOptions: { idempotencyKey } });
     const qrCode = result?.point_of_interaction?.transaction_data?.qr_code || null;
@@ -257,7 +279,7 @@ router.post('/pix', async (req, res) => {
       result?.id || null,
       email,
       idempotencyKey,
-      JSON.stringify({ qrCode, qrCodeBase64, mp: result })
+      JSON.stringify({ qrCode, qrCodeBase64, mp: result, deferredExpiration })
     ]);
 
     return res.status(201).json({
@@ -265,7 +287,7 @@ router.post('/pix', async (req, res) => {
       status: result?.status,
       qrCode,
       qrCodeBase64,
-      expiresAt: result?.date_of_expiration || null,
+      expiresAt: result?.date_of_expiration || deferredExpiration || null,
     });
   } catch (error) {
     console.error('❌ [PIX Error]:', error.message);
