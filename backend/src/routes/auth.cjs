@@ -302,7 +302,7 @@ router.get('/verify', async (req, res) => {
   try {
     const token = req.cookies?.token || req.headers.authorization?.replace('Bearer ', '');
     if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
+      return res.status(200).json({ user: null, access: null });
     }
     const decoded = jwt.verify(token, JWT_SECRET);
     let access;
