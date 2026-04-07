@@ -14,6 +14,42 @@ async function ensureColumn(connection, table, columnDefinition) {
   }
 }
 
+async function purgeDemoAccounts(connection) {
+  const demoEmails = ['debugteste@example.com'];
+  const demoCompanyNames = ['Empresa Demo', 'Debug Teste'];
+
+  const [demoUsers] = await connection.query(
+    `
+      SELECT u.id, u.email
+      FROM users u
+      LEFT JOIN tenants t ON t.id = u.tenant_id
+      WHERE u.email LIKE ? OR u.email IN (?) OR t.company_name IN (?)
+    `,
+    ['%@sored.demo', demoEmails, demoCompanyNames]
+  );
+
+  if (!Array.isArray(demoUsers) || demoUsers.length === 0) {
+    return 0;
+  }
+
+  const demoTenantIds = await connection.query(
+    `
+      SELECT DISTINCT u.tenant_id
+      FROM users u
+      LEFT JOIN tenants t ON t.id = u.tenant_id
+      WHERE u.email LIKE ? OR u.email IN (?) OR t.company_name IN (?)
+    `,
+    ['%@sored.demo', demoEmails, demoCompanyNames]
+  ).then(([rows]) => rows.map((row) => row.tenant_id).filter(Boolean));
+
+  if (demoTenantIds.length > 0) {
+    await connection.query('DELETE FROM payments WHERE payer_email LIKE ? OR payer_email IN (?)', ['%@sored.demo', demoEmails]);
+    await connection.query('DELETE FROM tenants WHERE id IN (?)', [demoTenantIds]);
+  }
+
+  return demoUsers.length;
+}
+
 async function initDB() {
   let connection;
   const isProduction = process.env.NODE_ENV === 'production';
@@ -97,6 +133,13 @@ async function initDB() {
     await ensureColumn(connection, 'users', 'trial_ends_at DATETIME NULL');
     await ensureColumn(connection, "users", "access_status VARCHAR(50) DEFAULT 'trial'");
 
+    if (isProduction) {
+      const purged = await purgeDemoAccounts(connection);
+      if (purged > 0) {
+        console.log(`🧹 [INIT DB] Contas demo removidas da produção: ${purged}`);
+      }
+    }
+
     console.log('✅ [INIT DB] Tabelas verificadas/criadas com sucesso!');
   } catch (error) {
      console.error('❌ [INIT DB Error]:', error.message);
@@ -106,4 +149,4 @@ async function initDB() {
   }
 }
 
-module.exports = { initDB };
+module.exports = { initDB, purgeDemoAccounts };
