@@ -20,6 +20,7 @@ const AppContent: React.FC = () => {
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'pending' | 'failure' | null>(null);
   const [showPlans, setShowPlans] = useState(false);
   const [showBlockedPaywall, setShowBlockedPaywall] = useState(false);
+  const [authInitialView, setAuthInitialView] = useState<'login' | 'signup'>('signup');
 
   const isAccessBlocked = Boolean(authError && authError.toLowerCase().includes('access blocked'));
 
@@ -54,6 +55,7 @@ const AppContent: React.FC = () => {
             onTryAnotherAccount={() => {
               clearAuthError();
               setShowBlockedPaywall(false);
+              setAuthInitialView('login');
               setShowAuth(true);
             }}
           />
@@ -64,14 +66,14 @@ const AppContent: React.FC = () => {
     return (
       <>
         {showAuth && paymentStatus === 'success' ? (
-          <AuthPage paymentApproved={true} />
+          <AuthPage paymentApproved={true} initialView="signup" />
         ) : showAuth ? (
-          <AuthPage paymentApproved={false} />
+          <AuthPage paymentApproved={false} initialView={authInitialView} />
         ) : (
           <LandingPage
             onGetStarted={() => {
-              setNextView('calculator');
-              setShowPlans(true);
+              setAuthInitialView('signup');
+              setShowAuth(true);
             }}
             paymentStatus={paymentStatus}
           />

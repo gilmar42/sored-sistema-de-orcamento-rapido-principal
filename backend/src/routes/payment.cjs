@@ -32,35 +32,16 @@ const planConfig = {
   annual: { amount: 1100, description: 'Plano Anual SORED' },
 };
 
+const TRIAL_DAYS = 5;
+
 function getPlanDurationMs(planType) {
   return planType === 'annual' ? 365 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
 }
 
 // Utilitário para criar plano no Mercado Pago
 async function createMPPlan({ planType, price, frequency, frequencyType }) {
-  // Mercado Pago v2 (PreApproval) requires an HTTPS back_url.
-  let successUrl = process.env.MP_SUCCESS_URL || '';
-  
-  if (!successUrl || successUrl.includes('localhost')) {
-    const baseFrontendUrl = process.env.FRONTEND_URL_PRODUCTION || process.env.FRONTEND_URL || (isProduction ? '' : 'http://localhost:5173');
-    if (!baseFrontendUrl) {
-      throw new Error('FRONTEND_URL_PRODUCTION não está configurada para produção');
-    }
-    successUrl = `${baseFrontendUrl}/sucesso`;
-  }
+  const body = buildPlanBody({ planType, price, frequency, frequencyType });
 
-  const body = {
-    reason: `Plano ${planType === 'monthly' ? 'Mensal' : 'Anual'} SaaS`,
-    auto_recurring: {
-      frequency,
-      frequency_type: frequencyType,
-      transaction_amount: price,
-      currency_id: 'BRL',
-    },
-    back_url: successUrl,
-    payment_methods_allowed: { payment_types: [{ id: 'credit_card' }] },
-  };
-  
   try {
     const { preApprovalPlan } = getMP();
     const result = await preApprovalPlan.create({ body });
@@ -78,6 +59,58 @@ function formatDT(d) {
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return null;
   return dt.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+function buildPlanBody({ planType, price, frequency, frequencyType }) {
+  // Mercado Pago v2 (PreApproval) requires an HTTPS back_url.
+  let successUrl = process.env.MP_SUCCESS_URL || '';
+
+  if (!successUrl || successUrl.includes('localhost')) {
+    const baseFrontendUrl = process.env.FRONTEND_URL_PRODUCTION || process.env.FRONTEND_URL || (isProduction ? '' : 'http://localhost:5173');
+    if (!baseFrontendUrl) {
+      throw new Error('FRONTEND_URL_PRODUCTION não está configurada para produção');
+    }
+    successUrl = `${baseFrontendUrl}/sucesso`;
+  }
+
+  return {
+    reason: `Plano ${planType === 'monthly' ? 'Mensal' : 'Anual'} SaaS`,
+    auto_recurring: {
+      frequency,
+      frequency_type: frequencyType,
+      transaction_amount: price,
+      currency_id: 'BRL',
+      free_trial: {
+        frequency: TRIAL_DAYS,
+        frequency_type: 'days',
+      },
+    },
+    back_url: successUrl,
+    payment_methods_allowed: { payment_types: [{ id: 'credit_card' }] },
+  };
+}
+
+async function syncMPPlanTrial(planId, planBody) {
+  const token = process.env.MP_ACCESS_TOKEN;
+  if (!token) {
+    throw new Error('MP_ACCESS_TOKEN não está definido no ambiente/.env');
+  }
+
+  const response = await fetch(`https://api.mercadopago.com/preapproval_plan/${planId}`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(planBody),
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(`Falha ao atualizar plano com trial: ${response.status} ${details}`);
+  }
+
+  return response.json();
 }
 
 function parsePixExpiration(expiresAt) {
@@ -208,6 +241,9 @@ router.post('/plans', async (req, res) => {
       );
       const [mRows] = await db.query('SELECT * FROM plans WHERE planType = ? LIMIT 1', ['monthly']);
       monthlyPlan = mRows[0];
+    } else {
+      const monthlyBody = buildPlanBody({ planType: 'monthly', price: monthlyPlan.price, frequency: monthlyPlan.frequency, frequencyType: monthlyPlan.frequencyType });
+      await syncMPPlanTrial(monthlyPlan.mpPlanId, monthlyBody);
     }
     // Cria plano anual
     let [aRows] = await db.query('SELECT * FROM plans WHERE planType = ? LIMIT 1', ['annual']);
@@ -225,6 +261,9 @@ router.post('/plans', async (req, res) => {
       );
       const [aNewRows] = await db.query('SELECT * FROM plans WHERE planType = ? LIMIT 1', ['annual']);
       annualPlan = aNewRows[0];
+    } else {
+      const annualBody = buildPlanBody({ planType: 'annual', price: annualPlan.price, frequency: annualPlan.frequency, frequencyType: annualPlan.frequencyType });
+      await syncMPPlanTrial(annualPlan.mpPlanId, annualBody);
     }
     res.status(201).json({ monthlyPlan, annualPlan });
   } catch (error) {
@@ -340,6 +379,13 @@ router.post('/subscriptions', async (req, res) => {
     const [pRows] = await db.query('SELECT * FROM plans WHERE planType = ? LIMIT 1', [planType]);
     const plan = pRows[0];
     if (!plan) return res.status(404).json({ error: 'Plano não encontrado' });
+    const planBody = buildPlanBody({
+      planType,
+      price: plan.price,
+      frequency: plan.frequency,
+      frequencyType: plan.frequencyType,
+    });
+    await syncMPPlanTrial(plan.mpPlanId, planBody);
 
     let [uRows] = await db.query('SELECT * FROM users WHERE email = ? LIMIT 1', [email]);
     let user = uRows[0];

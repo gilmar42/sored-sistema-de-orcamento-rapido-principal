@@ -4,10 +4,11 @@ import { SoredIcon } from '../Icons';
 
 interface AuthPageProps {
   paymentApproved?: boolean;
+  initialView?: 'login' | 'signup';
 }
 
-export const AuthPage: React.FC<AuthPageProps> = ({ paymentApproved = false }) => {
-  const [isLoginView, setIsLoginView] = useState(!paymentApproved);
+export const AuthPage: React.FC<AuthPageProps> = ({ paymentApproved = false, initialView = 'signup' }) => {
+  const [isLoginView, setIsLoginView] = useState(paymentApproved ? false : initialView === 'login');
   const { login, signup, authError } = useAuth();
 
   const [email, setEmail] = useState('');
