@@ -52,6 +52,18 @@ function generateId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 }
 
+function normalizeUserRecord(user) {
+  if (!user) return null;
+  return {
+    ...user,
+    passwordHash: user.passwordHash || user.password_hash || null,
+    tenantId: user.tenantId || user.tenant_id || null,
+    trialStartedAt: user.trialStartedAt || user.trial_started_at || null,
+    trialEndsAt: user.trialEndsAt || user.trial_ends_at || null,
+    accessStatus: user.accessStatus || user.access_status || 'trial',
+  };
+}
+
 function createTrialWindow() {
   const trialStartedAt = new Date();
   const trialEndsAt = new Date(trialStartedAt.getTime() + 5 * 24 * 60 * 60 * 1000);
@@ -91,10 +103,14 @@ async function createTenantUserAndTrial(companyName, email, passwordHash) {
     email,
     passwordHash,
     tenantId,
+    tenant_id: tenantId,
     name: null,
     trialStartedAt: trial.trialStartedAt,
+    trial_started_at: trial.trialStartedAt,
     trialEndsAt: trial.trialEndsAt,
+    trial_ends_at: trial.trialEndsAt,
     accessStatus: 'trial',
+    access_status: 'trial',
   });
 
   await saveState(state);
@@ -108,12 +124,12 @@ async function createTenantUserAndTrial(companyName, email, passwordHash) {
 
 async function findUserByEmail(email) {
   const state = await loadState();
-  return state.users.find((user) => user.email.toLowerCase() === email.toLowerCase()) || null;
+  return normalizeUserRecord(state.users.find((user) => user.email.toLowerCase() === email.toLowerCase()) || null);
 }
 
 async function findUserById(userId) {
   const state = await loadState();
-  return state.users.find((user) => user.id === userId) || null;
+  return normalizeUserRecord(state.users.find((user) => user.id === userId) || null);
 }
 
 async function storeRefreshToken(userId, token, expiresAt) {
@@ -146,6 +162,7 @@ async function setAccessStatus(userId, accessStatus) {
   const user = state.users.find((entry) => entry.id === userId);
   if (!user) return null;
   user.accessStatus = accessStatus;
+  user.access_status = accessStatus;
   await saveState(state);
   return user;
 }
@@ -160,8 +177,11 @@ async function ensureTrial(userId) {
   if (!user.trialStartedAt || !user.trialEndsAt) {
     const trial = createTrialWindow();
     user.trialStartedAt = trial.trialStartedAt;
+    user.trial_started_at = trial.trialStartedAt;
     user.trialEndsAt = trial.trialEndsAt;
+    user.trial_ends_at = trial.trialEndsAt;
     user.accessStatus = user.accessStatus || 'trial';
+    user.access_status = user.accessStatus;
     await saveState(state);
   }
 

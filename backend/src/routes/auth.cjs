@@ -45,35 +45,42 @@ function canUseFallbackAuth(error) {
 
 async function handleFallbackSignup(req, res) {
   const { companyName, email, password } = req.body;
-  const passwordHash = await bcrypt.hash(password, 10);
-  const created = await createTenantUserAndTrial(companyName, email, passwordHash);
+  try {
+    const passwordHash = await bcrypt.hash(password, 10);
+    const created = await createTenantUserAndTrial(companyName, email, passwordHash);
 
-  sendWelcomeEmail({
-    to: email,
-    companyName,
-    tenantId: created.tenantId,
-    userId: created.userId,
-  }).catch((err) => console.error('Failed to send welcome email:', err));
-
-  const access = await reconcileFallbackAccess(created.userId);
-  if (!access.allowed) {
-    return res.status(403).json(blockedPayload(access));
-  }
-
-  const token = jwt.sign({ userId: created.userId, email, tenantId: created.tenantId }, JWT_SECRET, { expiresIn: '7d' });
-  const refreshToken = generateRefreshToken();
-  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
-  await storeRefreshToken(created.userId, refreshToken, expiresAt);
-  issueSession(res, token, refreshToken);
-
-  return res.json({
-    user: {
-      id: created.userId,
-      email,
+    sendWelcomeEmail({
+      to: email,
+      companyName,
       tenantId: created.tenantId,
-    },
-    access,
-  });
+      userId: created.userId,
+    }).catch((err) => console.error('Failed to send welcome email:', err));
+
+    const access = await reconcileFallbackAccess(created.userId);
+    if (!access.allowed) {
+      return res.status(403).json(blockedPayload(access));
+    }
+
+    const token = jwt.sign({ userId: created.userId, email, tenantId: created.tenantId }, JWT_SECRET, { expiresIn: '7d' });
+    const refreshToken = generateRefreshToken();
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+    await storeRefreshToken(created.userId, refreshToken, expiresAt);
+    issueSession(res, token, refreshToken);
+
+    return res.json({
+      user: {
+        id: created.userId,
+        email,
+        tenantId: created.tenantId,
+      },
+      access,
+    });
+  } catch (error) {
+    if (error && error.code === 'USER_EXISTS') {
+      return res.status(400).json({ error: 'User already exists' });
+    }
+    throw error;
+  }
 }
 
 async function handleFallbackLogin(req, res) {
@@ -202,6 +209,9 @@ router.post('/signup', async (req, res) => {
       try {
         return await handleFallbackSignup(req, res);
       } catch (fallbackError) {
+        if (fallbackError && fallbackError.code === 'USER_EXISTS') {
+          return res.status(400).json({ error: 'User already exists' });
+        }
         console.error('Fallback signup error:', fallbackError);
         return res.status(500).json({ error: 'Internal server error' });
       }
@@ -263,6 +273,9 @@ router.post('/login', async (req, res) => {
       try {
         return await handleFallbackLogin(req, res);
       } catch (fallbackError) {
+        if (fallbackError && fallbackError.message === 'Invalid credentials') {
+          return res.status(401).json({ error: 'Invalid credentials' });
+        }
         console.error('Fallback login error:', fallbackError);
         return res.status(500).json({ error: 'Internal server error' });
       }
