@@ -46,15 +46,38 @@ function normalizeCompanyName(companyName) {
   return String(companyName || '').trim();
 }
 
+function collectErrorMessages(error, seen = new Set()) {
+  if (!error || seen.has(error)) return [];
+  seen.add(error);
+
+  const messages = [String(error.message || '')];
+  if (error.cause) {
+    messages.push(...collectErrorMessages(error.cause, seen));
+  }
+  if (Array.isArray(error.errors)) {
+    for (const nestedError of error.errors) {
+      messages.push(...collectErrorMessages(nestedError, seen));
+    }
+  }
+
+  return messages.filter(Boolean);
+}
+
 function isDatabaseUnavailableError(error) {
-  const message = String(error?.message || '');
+  const codes = new Set([
+    error?.code,
+    error?.cause?.code,
+    ...(Array.isArray(error?.errors) ? error.errors.map((nestedError) => nestedError?.code) : []),
+  ].filter(Boolean));
+  const messages = collectErrorMessages(error).join(' | ');
   return (
-    error?.code === 'ECONNREFUSED' ||
-    error?.code === 'ENOTFOUND' ||
-    error?.code === 'ETIMEDOUT' ||
-    error?.code === 'EHOSTUNREACH' ||
+    codes.has('ECONNREFUSED') ||
+    codes.has('ENOTFOUND') ||
+    codes.has('ETIMEDOUT') ||
+    codes.has('EHOSTUNREACH') ||
+    codes.has('ER_ACCESS_DENIED_ERROR') ||
     error?.errno === -111 ||
-    /connect ECONNREFUSED|can't connect to mysql server|server has gone away|lost connection to mysql server|er_bad_db_error|er_access_denied_error/i.test(message)
+    /connect ECONNREFUSED|can't connect to mysql server|server has gone away|lost connection to mysql server|er_bad_db_error|er_access_denied_error/i.test(messages)
   );
 }
 

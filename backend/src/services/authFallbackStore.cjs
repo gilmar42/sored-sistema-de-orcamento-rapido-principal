@@ -140,6 +140,23 @@ function isFuture(datetime) {
   return !Number.isNaN(value.getTime()) && value.getTime() > Date.now();
 }
 
+function collectErrorMessages(error, seen = new Set()) {
+  if (!error || seen.has(error)) return [];
+  seen.add(error);
+
+  const messages = [String(error.message || '')];
+  if (error.cause) {
+    messages.push(...collectErrorMessages(error.cause, seen));
+  }
+  if (Array.isArray(error.errors)) {
+    for (const nestedError of error.errors) {
+      messages.push(...collectErrorMessages(nestedError, seen));
+    }
+  }
+
+  return messages.filter(Boolean);
+}
+
 async function createTenantUserAndTrial(companyName, email, passwordHash) {
   const state = await loadState();
   if (isDemoEmail(email) || isDemoCompanyName(companyName)) {
@@ -280,15 +297,19 @@ async function reconcileAccess(userId) {
 
 function isDatabaseUnavailable(error) {
   if (!error) return false;
-  const code = error.code || '';
-  const message = String(error.message || '').toLowerCase();
-  return [
-    'ECONNREFUSED',
-    'ETIMEDOUT',
-    'ENOTFOUND',
-    'EHOSTUNREACH',
-    'ER_ACCESS_DENIED_ERROR',
-  ].includes(code) || message.includes('econnrefused') || message.includes('connection refused');
+  const codes = new Set([
+    error.code,
+    error.cause?.code,
+    ...(Array.isArray(error.errors) ? error.errors.map((nestedError) => nestedError?.code) : []),
+  ].filter(Boolean));
+  const message = collectErrorMessages(error).join(' ').toLowerCase();
+  return codes.has('ECONNREFUSED') ||
+    codes.has('ETIMEDOUT') ||
+    codes.has('ENOTFOUND') ||
+    codes.has('EHOSTUNREACH') ||
+    codes.has('ER_ACCESS_DENIED_ERROR') ||
+    message.includes('econnrefused') ||
+    message.includes('connection refused');
 }
 
 module.exports = {
