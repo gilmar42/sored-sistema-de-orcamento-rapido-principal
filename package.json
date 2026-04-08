@@ -47,6 +47,12 @@
   "@tailwindcss/vite": "^4.1.16",
   
     
+  "@tailwindcss/postcss": "^4.1.17",
+  
+    
+  "@vitejs/plugin-react": "^5.1.2",
+  
+    
   "@types/react": "^18.2.0",
   
     
@@ -88,6 +94,12 @@
   "react-dom": "^18.3.1",
   
     
+  "terser": "^5.44.1",
+  
+    
+  "vite": "^7.3.1",
+  
+    
   "uuid": "^13.0.0",
   
     
@@ -107,9 +119,6 @@
   "@babel/preset-typescript": "^7.28.5",
   
     
-  "@tailwindcss/postcss": "^4.1.17",
-  
-    
   "@testing-library/jest-dom": "^6.0.0",
   
     
@@ -123,9 +132,6 @@
   
     
   "@types/node": "^25.0.10",
-  
-    
-  "@vitejs/plugin-react": "^5.1.2",
   
     
   "autoprefixer": "^10.4.19",
@@ -153,19 +159,13 @@
   "supertest": "^7.2.2",
   
     
-  "terser": "^5.44.1",
-  
-    
   "ts-jest": "^29.0.0",
   
     
   "ts-node": "^10.9.2",
   
     
-  "typescript": "^5.9.3",
-  
-    
-  "vite": "^7.3.1"
+  "typescript": "^5.9.3"
   
   }
 }

@@ -5,7 +5,7 @@
  * Executa todos os testes e valida se o sistema está pronto para deploy
  */
 
-const { execSync } = require('child_process');
+const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -53,15 +53,27 @@ const validationChecklist = {
   },
 };
 
-// Função para executar comandos
-function runCommand(command, description) {
+const nodeCommand = process.execPath;
+const nodeEnvRunner = path.join(__dirname, 'run-with-node-env.cjs');
+
+// Função para executar comandos sem depender do shell
+function runCommand(command, args, description) {
   log.info(`Executando: ${description}...`);
-  try {
-    const output = execSync(command, { encoding: 'utf-8', stdio: 'pipe' });
-    return { success: true, output };
-  } catch (error) {
-    return { success: false, error: error.message, output: error.stdout || error.stderr };
+  const result = spawnSync(command, args, {
+    encoding: 'utf-8',
+    stdio: 'pipe',
+    shell: false,
+  });
+
+  if (result.status === 0) {
+    return { success: true, output: result.stdout || '' };
   }
+
+  return {
+    success: false,
+    error: result.error?.message || `Command exited with code ${result.status}`,
+    output: result.stdout || result.stderr || '',
+  };
 }
 
 // 1. Validar dependências
@@ -154,7 +166,8 @@ function runTests() {
   log.info('Executando suite completa de testes...');
   
   const result = runCommand(
-    'npm test -- --testPathPattern="production|e2e" --passWithNoTests --silent',
+    nodeCommand,
+    [nodeEnvRunner, 'test', 'jest', '--config', 'jest.config.cjs', '--runInBand'],
     'Jest Test Runner'
   );
   
@@ -180,7 +193,11 @@ function buildProduction() {
   log.header('4. GERANDO BUILD DE PRODUÇÃO');
   
   log.info('Executando build...');
-  const result = runCommand('npm run build', 'Vite Build');
+  const result = runCommand(
+    nodeCommand,
+    [nodeEnvRunner, 'production', 'vite', 'build'],
+    'Vite Build'
+  );
   
   if (result.success) {
     // Verificar se a pasta dist foi criada

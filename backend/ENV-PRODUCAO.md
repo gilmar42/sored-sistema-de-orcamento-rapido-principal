@@ -2,6 +2,8 @@
 
 Clique no campo para ir direto à explicação.
 
+Veja também o checklist prático de deploy em [docs/HOSTINGER-MYSQL-CHECKLIST.md](../docs/HOSTINGER-MYSQL-CHECKLIST.md).
+
 ## Índice
 
 - [`NODE_ENV`](#node_env)
