@@ -10,7 +10,7 @@
   
   "scripts": {
   
-    "start": "cross-env NODE_ENV=production node server.js",
+    "start": "node scripts/run-with-node-env.cjs production node server.js",
   
     
   "dev": "vite",
@@ -22,13 +22,13 @@
   "backend": "node backend/src/app.cjs",
   
     
-  "build": "cross-env NODE_ENV=production vite build",
+  "build": "node scripts/run-with-node-env.cjs production vite build",
   
     
   "preview": "vite preview",
   
     
-  "test": "cross-env NODE_ENV=test jest --config jest.config.cjs",
+  "test": "node scripts/run-with-node-env.cjs test jest --config jest.config.cjs",
   
     
   "test:production": "jest --config jest.config.cjs --testPathPattern=\"production|e2e\"",
@@ -37,7 +37,7 @@
   "validate:production": "node scripts/validate-production.cjs",
   
     
-  "start:backend": "cross-env NODE_ENV=production node backend/src/app.cjs"
+  "start:backend": "node scripts/run-with-node-env.cjs production node backend/src/app.cjs"
   
   },
   
@@ -137,7 +137,6 @@
   "concurrently": "^9.2.1",
   
     
-  "cross-env": "^10.1.0",
   
     
   "identity-obj-proxy": "^3.0.0",
