@@ -184,7 +184,12 @@ curl http://localhost:5000/api/materials \
 ### Backend:
 - Railway / Render / Heroku
 - Mudar `JWT_SECRET` para valor seguro
-- Configurar `NODE_ENV=production`
+- Usar o bloco de ambiente de produção:
+```env
+NODE_ENV=production
+PORT=5000
+JWT_SECRET=sua-chave-segura
+```
 - Usar PostgreSQL ou MySQL (opcional)
 
 ### Frontend:

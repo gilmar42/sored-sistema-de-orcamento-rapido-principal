@@ -311,7 +311,7 @@ VITE_FRONTEND_URL=https://seu-dominio.com
 
 ### Backend
 - [ ] Variáveis de ambiente todas definidas
-- [ ] `NODE_ENV=production`
+- [ ] Ambiente configurado com `NODE_ENV=production`
 - [ ] `JWT_SECRET` forte (20+ caracteres aleatórios)
 - [ ] `FRONTEND_URL_PRODUCTION` aponta para o domínio público correto
 - [ ] CORS configurado com domínio de produção

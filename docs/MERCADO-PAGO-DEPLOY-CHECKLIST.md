@@ -29,7 +29,7 @@ DB_PORT=3306                             # ✅ PRODUÇÃO
 
 **Validar**:
 - [ ] Nenhuma variável vazia ou com placeholder
-- [ ] `NODE_ENV` é `production`
+- [ ] Ambiente de produção ativo com `NODE_ENV=production`
 - [ ] URLs usam HTTPS
 - [ ] Credenciais são do ambiente de **PRODUÇÃO** do Mercado Pago (não sandbox)
 
