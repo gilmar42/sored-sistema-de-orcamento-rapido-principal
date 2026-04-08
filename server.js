@@ -20,6 +20,16 @@ const distPath = path.join(__dirname, 'frontend', 'dist');
 // Serve os arquivos estáticos
 app.use(express.static(distPath));
 
+// Favicon explícito para evitar requisição ao /favicon.ico sem arquivo correspondente
+app.get('/favicon.ico', (req, res) => {
+    const faviconPath = path.join(distPath, 'favicon.svg');
+    if (fs.existsSync(faviconPath)) {
+        res.type('image/svg+xml');
+        return res.sendFile(faviconPath);
+    }
+    return res.status(204).end();
+});
+
 // Rota de Check-in de Emergência (Para provar o Deploy)
 app.get('/api/check-in', (req, res) => {
     res.json({
