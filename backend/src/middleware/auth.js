@@ -17,14 +17,23 @@ const authMiddleware = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, JWT_SECRET);
+    const userId = decoded.userId || decoded.id || decoded.sub;
+
+    if (!userId) {
+      return res.status(401).json({
+        error: 'Invalid token payload',
+        details: 'Missing user identifier in token',
+      });
+    }
+
     let access;
     try {
-      access = await reconcileUserAccess(decoded.userId);
+      access = await reconcileUserAccess(userId);
     } catch (error) {
       if (!isDatabaseUnavailable(error)) {
         throw error;
       }
-      access = await reconcileFallbackAccess(decoded.userId);
+      access = await reconcileFallbackAccess(userId);
     }
     if (!access.allowed) {
       return res.status(403).json({
@@ -35,11 +44,14 @@ const authMiddleware = async (req, res, next) => {
       });
     }
 
-    req.user = decoded;
+    req.user = { ...decoded, userId };
     req.access = access;
     next();
   } catch (error) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    return res.status(401).json({
+      error: 'Invalid or expired token',
+      details: error.message,
+    });
   }
 };
 
