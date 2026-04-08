@@ -404,7 +404,9 @@ router.get('/verify', async (req, res) => {
       access,
     });
   } catch (error) {
-    return res.status(401).json({ error: 'Invalid token' });
+    res.clearCookie('token', cookieOptions);
+    res.clearCookie('refreshToken', cookieOptions);
+    return res.status(200).json({ user: null, access: null });
   }
 });
 
