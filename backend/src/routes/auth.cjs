@@ -19,7 +19,7 @@ const { sendWelcomeEmail } = require('../services/emailService');
 const isProduction = process.env.NODE_ENV === 'production';
 const cookieOptions = {
   httpOnly: true,
-  sameSite: isProduction ? 'none' : 'lax',
+  sameSite: 'none',
   secure: isProduction,
   path: '/',
 };
