@@ -69,15 +69,18 @@ function isDatabaseUnavailableError(error) {
     error?.cause?.code,
     ...(Array.isArray(error?.errors) ? error.errors.map((nestedError) => nestedError?.code) : []),
   ].filter(Boolean));
-  const messages = collectErrorMessages(error).join(' | ');
+  const messages = collectErrorMessages(error).join(' | ').toLowerCase();
   return (
     codes.has('ECONNREFUSED') ||
     codes.has('ENOTFOUND') ||
     codes.has('ETIMEDOUT') ||
     codes.has('EHOSTUNREACH') ||
     codes.has('ER_ACCESS_DENIED_ERROR') ||
+    codes.has('ER_BAD_DB_ERROR') ||
+    codes.has('ER_NO_SUCH_TABLE') ||
+    codes.has('ER_NO_SUCH_DATABASE') ||
     error?.errno === -111 ||
-    /connect ECONNREFUSED|can't connect to mysql server|server has gone away|lost connection to mysql server|er_bad_db_error|er_access_denied_error/i.test(messages)
+    /connect ECONNREFUSED|can't connect to mysql server|server has gone away|lost connection to mysql server|er_bad_db_error|er_access_denied_error|er_no_such_table|er_no_such_database|protocol_connection_lost/i.test(messages)
   );
 }
 

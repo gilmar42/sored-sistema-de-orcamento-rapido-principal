@@ -70,6 +70,17 @@ app.use(cookieParser()); // Necessário para ler cookies de token
 // Webhook precisa receber raw body para validação de assinatura (se necessário)
 app.use('/api/payments/webhooks', express.raw({ type: '*/*' }));
 app.use(express.json({ limit: '10mb' }));
+app.use((error, req, res, next) => {
+  if (
+    error instanceof SyntaxError ||
+    error.type === 'entity.parse.failed' ||
+    error.type === 'entity.unsupported' ||
+    (error.status === 400 && 'body' in error)
+  ) {
+    return res.status(400).json({ error: 'Invalid JSON payload' });
+  }
+  return next(error);
+});
 
 // Health check & Diagnostics
 app.get('/api', (req, res) => {

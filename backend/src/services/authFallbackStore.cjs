@@ -308,8 +308,15 @@ function isDatabaseUnavailable(error) {
     codes.has('ENOTFOUND') ||
     codes.has('EHOSTUNREACH') ||
     codes.has('ER_ACCESS_DENIED_ERROR') ||
+    codes.has('ER_BAD_DB_ERROR') ||
+    codes.has('ER_NO_SUCH_TABLE') ||
+    codes.has('ER_NO_SUCH_DATABASE') ||
     message.includes('econnrefused') ||
-    message.includes('connection refused');
+    message.includes('connection refused') ||
+    message.includes('er_bad_db_error') ||
+    message.includes('er_no_such_table') ||
+    message.includes('er_no_such_database') ||
+    message.includes('protocol_connection_lost');
 }
 
 module.exports = {
