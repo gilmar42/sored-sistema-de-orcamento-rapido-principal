@@ -8,6 +8,7 @@ jest.mock('../../services/api', () => ({
     signup: jest.fn(),
     logout: jest.fn(),
     verifyToken: jest.fn(),
+    refresh: jest.fn(),
   },
 }));
 

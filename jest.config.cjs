@@ -29,6 +29,7 @@ module.exports = {
   testMatch: [
     '<rootDir>/frontend/**/*.test.tsx',
     '<rootDir>/frontend/**/*.test.ts',
+    '<rootDir>/backend/test/**/*.test.js',
   ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   moduleDirectories: ['node_modules', '<rootDir>/frontend'],

@@ -111,6 +111,15 @@ function canUseFallbackAuth(error) {
   return isDatabaseUnavailable(error) || isDatabaseUnavailableError(error);
 }
 
+function isUserMissingError(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return message.includes('user not found');
+}
+
+function shouldFallbackAuth(error) {
+  return canUseFallbackAuth(error) || isUserMissingError(error);
+}
+
 async function handleFallbackSignup(req, res) {
   const { companyName, email, password } = req.body;
   const normalizedEmail = normalizeEmail(email);
@@ -449,7 +458,7 @@ router.get('/verify', async (req, res) => {
     try {
       access = await reconcileUserAccess(decoded.userId);
     } catch (error) {
-      if (!canUseFallbackAuth(error)) {
+      if (!shouldFallbackAuth(error)) {
         throw error;
       }
       access = await reconcileFallbackAccess(decoded.userId);
@@ -478,18 +487,26 @@ router.post('/refresh', async (req, res) => {
     const refreshToken = req.cookies?.refreshToken;
     if (!refreshToken) return res.status(401).json({ error: 'No refresh token' });
 
+    let useFallback = false;
+    let storedToken = null;
+    let user = null;
+
     try {
       const [tokens] = await db.query('SELECT * FROM refresh_tokens WHERE token = ?', [refreshToken]);
-      const storedToken = tokens[0];
+      storedToken = tokens[0];
 
       if (!storedToken || new Date(storedToken.expires_at) < new Date()) {
-        return res.status(401).json({ error: 'Invalid or expired refresh token' });
+        useFallback = true;
+        throw new Error('DB_REFRESH_TOKEN_NOT_FOUND');
       }
 
       const [users] = await db.query('SELECT * FROM users WHERE id = ?', [storedToken.user_id]);
-      const user = users[0];
+      user = users[0];
 
-      if (!user) return res.status(401).json({ error: 'User not found' });
+      if (!user) {
+        useFallback = true;
+        throw new Error('DB_USER_NOT_FOUND');
+      }
 
       const access = await reconcileUserAccess(user.id);
       if (!access.allowed) {
@@ -503,18 +520,18 @@ router.post('/refresh', async (req, res) => {
       );
 
       res.cookie('token', newToken, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 });
-      res.json({ user: buildUserResponse(user), access });
+      return res.json({ user: buildUserResponse(user), access });
     } catch (error) {
-      if (!canUseFallbackAuth(error)) {
+      if (!useFallback && !shouldFallbackAuth(error) && !['DB_REFRESH_TOKEN_NOT_FOUND', 'DB_USER_NOT_FOUND'].includes(error.message)) {
         throw error;
       }
 
-      const storedToken = await getRefreshToken(refreshToken);
+      storedToken = storedToken || (await getRefreshToken(refreshToken));
       if (!storedToken || new Date(storedToken.expiresAt) < new Date()) {
         return res.status(401).json({ error: 'Invalid or expired refresh token' });
       }
 
-      const user = await findUserById(storedToken.userId);
+      user = await findUserById(storedToken.userId);
       if (!user) return res.status(401).json({ error: 'User not found' });
 
       const access = await reconcileFallbackAccess(user.id);

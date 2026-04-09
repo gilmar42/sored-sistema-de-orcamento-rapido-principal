@@ -68,26 +68,44 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
   };
 
+  const setSession = (data: any) => {
+    const normalizedUser = normalizeUser(data?.user);
+    if (normalizedUser) {
+      setAuthError(null);
+      applyAccess(data.access);
+      setCurrentUser(normalizedUser);
+      return true;
+    }
+    setCurrentUser(null);
+    applyAccess(null);
+    return false;
+  };
 
   // Checa sessão no backend ao montar
   useEffect(() => {
     const checkSession = async () => {
       try {
         const data = await apiService.verifyToken();
-        const normalizedUser = normalizeUser(data?.user);
-        if (normalizedUser) {
-          setAuthError(null);
-          applyAccess(data.access);
-          setCurrentUser(normalizedUser);
-        } else {
-          setCurrentUser(null);
-          applyAccess(null);
+        if (setSession(data)) {
+          return;
         }
+        setAuthError(null);
       } catch (error) {
-        setCurrentUser(null);
-        applyAccess(null);
-        if (error instanceof Error) {
+        if (error instanceof Error && error.message.toLowerCase().includes('access blocked')) {
           setAuthError(error.message);
+        } else {
+          try {
+            const refreshData = await apiService.refresh();
+            if (setSession(refreshData)) {
+              return;
+            }
+          } catch (refreshError) {
+            if (refreshError instanceof Error && refreshError.message.toLowerCase().includes('access blocked')) {
+              setAuthError(refreshError.message);
+            } else {
+              setAuthError(null);
+            }
+          }
         }
       } finally {
         setIsLoading(false);

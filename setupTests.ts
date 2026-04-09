@@ -21,26 +21,28 @@ const memoryStorage = (() => {
   };
 })();
 
-Object.defineProperty(window, 'localStorage', {
-  value: memoryStorage,
-  writable: true,
-});
-
-// JSDOM does not implement matchMedia; provide a minimal stub for hooks relying on it
-if (!window.matchMedia) {
-  Object.defineProperty(window, 'matchMedia', {
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'localStorage', {
+    value: memoryStorage,
     writable: true,
-    value: (query: string) => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addListener: () => {},
-      removeListener: () => {},
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      dispatchEvent: () => false,
-    }),
   });
+
+  // JSDOM does not implement matchMedia; provide a minimal stub for hooks relying on it
+  if (!window.matchMedia) {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: (query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }),
+    });
+  }
 }
 
 Object.defineProperty(global, 'import.meta', {

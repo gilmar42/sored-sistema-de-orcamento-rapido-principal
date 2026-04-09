@@ -9,7 +9,7 @@ interface AuthPageProps {
 
 export const AuthPage: React.FC<AuthPageProps> = ({ paymentApproved = false, initialView = 'signup' }) => {
   const [isLoginView, setIsLoginView] = useState(paymentApproved ? false : initialView === 'login');
-  const { login, signup, authError } = useAuth();
+  const { login, signup, authError, clearAuthError } = useAuth();
   const isDev = typeof process !== 'undefined' ? process.env.NODE_ENV !== 'production' : false;
 
   const [email, setEmail] = useState('');
@@ -39,6 +39,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ paymentApproved = false, ini
       setIsLoginView(false);
     }
   }, [paymentApproved]);
+
+  useEffect(() => {
+    clearAuthError();
+  }, [clearAuthError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,6 +75,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ paymentApproved = false, ini
 
   const toggleView = () => {
     setIsLoginView(!isLoginView);
+    clearAuthError();
     setError('');
     setEmail('');
     setPassword('');
