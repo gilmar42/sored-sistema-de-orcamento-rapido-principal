@@ -46,7 +46,54 @@ const MainLayout: React.FC<MainLayoutProps> = ({ initialView, onOpenPlans }) => 
   const renderView = () => {
     switch (currentView) {
       case 'home':
-        return <LandingPage onGetStarted={handleGetStarted} />;
+        return (
+          <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-8">
+            <div className="mb-8">
+              <SoredIcon className="w-16 h-16 text-blue-600 mx-auto mb-4" />
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                Bem-vindo ao SORED
+              </h1>
+              <p className="text-lg text-gray-600 dark:text-gray-300 mb-6">
+                Sistema de Orçamento Rápido e Eficiente
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl">
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+                <CalculatorIcon className="w-8 h-8 text-blue-600 mb-3" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Calculadora de Orçamentos</h3>
+                <p className="text-gray-600 dark:text-gray-300 text-sm mb-4">Crie orçamentos detalhados com materiais e mão de obra</p>
+                <button
+                  onClick={() => setCurrentView('calculator')}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Começar
+                </button>
+              </div>
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+                <BoxIcon className="w-8 h-8 text-green-600 mb-3" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Gestão de Materiais</h3>
+                <p className="text-gray-600 dark:text-gray-300 text-sm mb-4">Gerencie seu catálogo de materiais e componentes</p>
+                <button
+                  onClick={() => setCurrentView('materials')}
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  Gerenciar
+                </button>
+              </div>
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+                <DocumentTextIcon className="w-8 h-8 text-purple-600 mb-3" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Orçamentos Salvos</h3>
+                <p className="text-gray-600 dark:text-gray-300 text-sm mb-4">Acesse seus orçamentos salvos e gere PDFs</p>
+                <button
+                  onClick={() => setCurrentView('quotes')}
+                  className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  Ver Orçamentos
+                </button>
+              </div>
+            </div>
+          </div>
+        );
       case 'calculator':
         // Adiciona data-testid para testes
         return <QuoteCalculator quoteToEdit={quoteToEdit} setQuoteToEdit={setQuoteToEdit} onNavigateToMaterials={() => setCurrentView('materials')} />;
