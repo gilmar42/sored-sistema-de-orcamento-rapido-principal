@@ -73,6 +73,7 @@ const AppContent: React.FC = () => {
               setAuthInitialView('signup');
               setShowAuth(true);
             }}
+            onOpenPlans={() => setShowPlans(true)}
             paymentStatus={paymentStatus}
           />
         )}

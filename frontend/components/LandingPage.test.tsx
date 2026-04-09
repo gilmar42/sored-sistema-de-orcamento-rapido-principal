@@ -73,6 +73,18 @@ describe('LandingPage', () => {
     expect(screen.queryByText(/Pagamento aprovado/i)).not.toBeInTheDocument();
   });
 
+  it('should display plans banner and open plans when clicking button', () => {
+    const mockGetStarted = jest.fn();
+    const mockOpenPlans = jest.fn();
+    render(<LandingPage onGetStarted={mockGetStarted} onOpenPlans={mockOpenPlans} paymentStatus={null} />);
+
+    expect(screen.getByText(/Plano Mensal/i)).toBeInTheDocument();
+    expect(screen.getByText(/Plano Anual/i)).toBeInTheDocument();
+    const viewPlansButton = screen.getByTestId('view-plans-section-button');
+    fireEvent.click(viewPlansButton);
+    expect(mockOpenPlans).toHaveBeenCalledTimes(1);
+  });
+
   it('should switch plan type when clicking plan buttons', () => {
     // Simula o clique nos botões de plano mensal/anual se existirem
     // Este teste é um placeholder, ajuste conforme a UI se houver botões visíveis

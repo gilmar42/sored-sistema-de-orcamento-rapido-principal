@@ -13,10 +13,11 @@ import {
 
 interface LandingPageProps {
   onGetStarted: () => void;
+  onOpenPlans?: () => void;
   paymentStatus?: 'success' | 'pending' | 'failure' | null;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, paymentStatus }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onOpenPlans, paymentStatus }) => {
   const features = [
     {
       icon: <CalculatorIcon className="w-12 h-12 text-blue-500" />,
@@ -51,6 +52,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, paymentS
     'Interface moderna e intuitiva',
     'Dados salvos automaticamente',
     'Modo escuro para conforto visual'
+  ];
+
+  const pricingPlans = [
+    {
+      name: 'Plano Mensal',
+      price: 'R$ 100/mês',
+      description: 'Ideal para quem quer testar o SORED com flexibilidade e pagar apenas pelo mês.',
+      highlight: 'Acesso completo e ilimitado',
+    },
+    {
+      name: 'Plano Anual',
+      price: 'R$ 1.100/ano',
+      description: 'A melhor opção para quem já sabe que vai usar o sistema regularmente.',
+      highlight: 'Economize R$ 100 ao ano',
+    },
   ];
 
   return (
@@ -101,20 +117,70 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, paymentS
                 </div>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={onGetStarted}
-                data-testid="cta-hero-plans"
-                className="group inline-flex items-center px-8 py-4 text-lg font-semibold text-blue-600 bg-white rounded-full hover:bg-gray-50 transform hover:scale-105 transition-all duration-300 shadow-xl hover:shadow-2xl relative"
-              >
-                <RocketLaunchIcon className="w-6 h-6 mr-2 group-hover:translate-x-1 transition-transform" />
-                {'Começar teste grátis'}
-                <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 rounded-full transition-opacity"></span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={onGetStarted}
+                  data-testid="cta-hero-plans"
+                  className="group inline-flex items-center px-8 py-4 text-lg font-semibold text-blue-600 bg-white rounded-full hover:bg-gray-50 transform hover:scale-105 transition-all duration-300 shadow-xl hover:shadow-2xl relative"
+                >
+                  <RocketLaunchIcon className="w-6 h-6 mr-2 group-hover:translate-x-1 transition-transform" />
+                  {'Começar teste grátis'}
+                  <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 rounded-full transition-opacity"></span>
+                </button>
+                {onOpenPlans && (
+                  <button
+                    type="button"
+                    onClick={onOpenPlans}
+                    data-testid="view-plans-button"
+                    className="mt-4 inline-flex items-center px-8 py-4 text-lg font-semibold text-white bg-blue-500 rounded-full hover:bg-blue-400 transform hover:scale-105 transition-all duration-300 shadow-xl hover:shadow-2xl"
+                  >
+                    Ver planos e valores
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
-        <div className="absolute bottom-0 left-0 right-0">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="rounded-3xl border border-slate-200/70 bg-white/90 dark:border-slate-700 dark:bg-slate-950/90 p-8 shadow-2xl">
+            <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
+              <div className="max-w-2xl">
+                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-blue-600">Como funciona</p>
+                <h2 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">Planos fáceis de entender e sem surpresa</h2>
+                <p className="mt-4 text-base leading-7 text-slate-600 dark:text-slate-300">
+                  Escolha entre o plano mensal ou anual. Seus orçamentos, materiais e clientes são gerenciados automaticamente, com exportação em PDF e suporte completo.
+                </p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {pricingPlans.map((plan) => (
+                  <div key={plan.name} className="rounded-3xl border border-slate-200/70 bg-slate-50 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-blue-600">{plan.name}</p>
+                    <p className="mt-3 text-3xl font-bold text-slate-900 dark:text-white">{plan.price}</p>
+                    <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">{plan.description}</p>
+                    <div className="mt-5 rounded-2xl bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700 dark:bg-blue-500/15 dark:text-blue-200">
+                      {plan.highlight}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {onOpenPlans && (
+              <div className="mt-8 text-center">
+                <button
+                  type="button"
+                  onClick={onOpenPlans}
+                  data-testid="view-plans-section-button"
+                  className="inline-flex items-center rounded-2xl bg-blue-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-blue-500"
+                >
+                  Ver todos os planos
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="absolute bottom-0 left-0 right-0">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 120" className="w-full fill-ice-50 dark:fill-slate-900">
             <path d="M0,64L48,69.3C96,75,192,85,288,80C384,75,480,53,576,48C672,43,768,53,864,64C960,75,1056,85,1152,80C1248,75,1344,53,1392,42.7L1440,32L1440,120L1392,120C1344,120,1248,120,1152,120C1056,120,960,120,864,120C768,120,672,120,576,120C480,120,384,120,288,120C192,120,96,120,48,120L0,120Z"></path>
           </svg>
@@ -174,8 +240,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, paymentS
           </div>
         </div>
       </div>
-      </div>
-
       {/* CTA Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
         <div className="bg-linear-to-r from-blue-600 to-purple-600 dark:from-blue-900 dark:to-purple-900 rounded-3xl p-12 text-center shadow-2xl relative overflow-hidden">
