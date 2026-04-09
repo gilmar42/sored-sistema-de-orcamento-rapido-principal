@@ -16,7 +16,6 @@ const AppContent: React.FC = () => {
   const { currentUser, isLoading, authError, clearAuthError } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
   const [nextView, setNextView] = useState<View>('home');
-  const [showLandingAfterLogin, setShowLandingAfterLogin] = useState(true);
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'pending' | 'failure' | null>(null);
   const [showPlans, setShowPlans] = useState(false);
   const [showBlockedPaywall, setShowBlockedPaywall] = useState(false);
@@ -41,16 +40,8 @@ const AppContent: React.FC = () => {
     if (isAccessBlocked) {
       setShowBlockedPaywall(true);
       setShowAuth(false);
-      setShowLandingAfterLogin(false);
     }
   }, [isAccessBlocked]);
-
-  useEffect(() => {
-    if (currentUser) {
-      setShowLandingAfterLogin(false);
-      setShowAuth(false);
-    }
-  }, [currentUser]);
 
   if (isLoading) return null;
   if (!currentUser) {
@@ -90,22 +81,7 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // Usuário autenticado: exibir landing de boas-vindas antes de entrar no layout
-  if (showLandingAfterLogin) {
-    return (
-      <>
-        <LandingPage
-          onGetStarted={() => {
-            setNextView('calculator');
-            setShowLandingAfterLogin(false);
-          }}
-          paymentStatus={paymentStatus}
-        />
-        <PlansModal open={showPlans} onClose={() => setShowPlans(false)} prefillEmail={currentUser?.email ?? ''} />
-      </>
-    );
-  }
-
+  // Usuário autenticado: vai direto para o sistema interno
   return (
     <DataProvider>
       <MainLayout initialView={nextView} onOpenPlans={() => setShowPlans(true)} />
