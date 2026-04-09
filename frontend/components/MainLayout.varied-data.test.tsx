@@ -101,9 +101,10 @@ describe('MainLayout varied data scenarios', () => {
       </MockAuthProvider>
     );
 
-    const materiaisBtn = screen.getByRole('button', { name: /Materiais/i });
-    expect(materiaisBtn).toBeInTheDocument();
-    await userEvent.click(materiaisBtn);
+    // Click the sidebar navigation button for Materiais (not the dashboard card)
+    const sidebarMateriaisBtn = screen.getByRole('button', { name: 'Materiais' });
+    expect(sidebarMateriaisBtn).toBeInTheDocument();
+    await userEvent.click(sidebarMateriaisBtn);
 
     // MaterialManagement should be present now
     expect(screen.queryByTestId('material-management-root')).toBeInTheDocument();
@@ -139,14 +140,14 @@ describe('MainLayout varied data scenarios', () => {
       </MockAuthProvider>
     );
 
-    const materiaisBtn = screen.getByRole('button', { name: /Materiais/i });
-    const novoBtn = screen.getByRole('button', { name: /Novo Orçamento/i });
+    const sidebarMateriaisBtn = screen.getByRole('button', { name: 'Materiais' });
+    const sidebarNovoBtn = screen.getByRole('button', { name: 'Novo Orçamento' });
 
     // Click materials, then immediately click novo several times
-    await userEvent.click(materiaisBtn);
-    await userEvent.click(novoBtn);
-    await userEvent.click(materiaisBtn);
-    await userEvent.click(novoBtn);
+    await userEvent.click(sidebarMateriaisBtn);
+    await userEvent.click(sidebarNovoBtn);
+    await userEvent.click(sidebarMateriaisBtn);
+    await userEvent.click(sidebarNovoBtn);
 
     // Final expected state: Novo Orçamento active, MaterialManagement unmounted
     expect(screen.queryByTestId('quote-calculator-root')).toBeInTheDocument();

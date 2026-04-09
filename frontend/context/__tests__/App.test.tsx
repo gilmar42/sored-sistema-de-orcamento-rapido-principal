@@ -65,7 +65,7 @@ describe('App Integration Tests', () => {
     expect(screen.getByText(/Sistema de Orçamento Rápido/i)).toBeInTheDocument();
   });
 
-  it('should render LandingPage first when authenticated user logs in', () => {
+  it('should render dashboard when authenticated user logs in', () => {
     mockUseAuth.mockReturnValue({
       currentUser: { id: 'U-1', email: 'test@example.com', tenantId: 'T-1', passwordHash: 'hashed' },
       tenantId: 'T-1',
@@ -76,8 +76,10 @@ describe('App Integration Tests', () => {
     });
     renderApp();
     
-    // Authenticated users see welcome landing page first
-    expect(screen.getByText(/Bem-vindo ao/i)).toBeInTheDocument();
+    // Authenticated users see dashboard with functionality cards
+    expect(screen.getByText('Criar Orçamento')).toBeInTheDocument();
+    expect(screen.getByText('Gerenciar Materiais')).toBeInTheDocument();
+    expect(screen.getByText('Ver Orçamentos')).toBeInTheDocument();
   });
 
   // Add more integration tests for other key user flows here
