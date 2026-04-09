@@ -119,12 +119,15 @@ async function startServer() {
       }
     }
 
-    // Sync users from MySQL to fallback store on startup
+    // Sync users from MySQL to fallback store on startup (only if MySQL is available)
     try {
+      // Test MySQL connection first
+      await db.query('SELECT 1');
+      console.log('✅ MySQL connection available, syncing users...');
       await syncFromMySQL(db);
-    } catch (syncError) {
-      console.error('⚠️ Falha na sincronização inicial com fallback store:', syncError.message);
-      // Don't fail startup if sync fails
+    } catch (dbError) {
+      console.log('ℹ️ MySQL not available, skipping sync:', dbError.message);
+      // Don't fail startup if MySQL is not available
     }
 
   } catch (error) {

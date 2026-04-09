@@ -340,17 +340,41 @@ async function reconcileAccess(userId) {
   };
 }
 
+function isDatabaseUnavailable(error) {
+  if (!error) return false;
+  const codes = new Set([
+    error.code,
+    error.cause?.code,
+    ...(Array.isArray(error.errors) ? error.errors.map((nestedError) => nestedError?.code) : []),
+  ].filter(Boolean));
+  const message = collectErrorMessages(error).join(' ').toLowerCase();
+  return codes.has('ECONNREFUSED') ||
+    codes.has('ETIMEDOUT') ||
+    codes.has('ENOTFOUND') ||
+    codes.has('EHOSTUNREACH') ||
+    codes.has('ER_ACCESS_DENIED_ERROR') ||
+    codes.has('ER_BAD_DB_ERROR') ||
+    codes.has('ER_NO_SUCH_TABLE') ||
+    codes.has('ER_NO_SUCH_DATABASE') ||
+    message.includes('econnrefused') ||
+    message.includes('connection refused') ||
+    message.includes('er_bad_db_error') ||
+    message.includes('er_no_such_table') ||
+    message.includes('er_no_such_database') ||
+    message.includes('protocol_connection_lost');
+}
+
 async function syncFromMySQL(db) {
   try {
     console.log('🔄 Synchronizing users from MySQL to fallback store...');
 
-    // Get all users from MySQL
+    // Get all users from MySQL with LEFT JOIN to handle missing tenants
     const [mysqlUsers] = await db.query(`
       SELECT u.id, u.email, u.password_hash, u.tenant_id, u.name,
              u.trial_started_at, u.trial_ends_at, u.access_status,
              t.company_name
       FROM users u
-      JOIN tenants t ON u.tenant_id = t.id
+      LEFT JOIN tenants t ON u.tenant_id = t.id
     `);
 
     const state = await loadState();
@@ -368,10 +392,10 @@ async function syncFromMySQL(db) {
 
       // Create tenant if doesn't exist
       let tenant = state.tenants.find(t => t.id === mysqlUser.tenant_id);
-      if (!tenant) {
+      if (!tenant && mysqlUser.tenant_id) {
         tenant = {
           id: mysqlUser.tenant_id,
-          companyName: String(mysqlUser.company_name || '').trim(),
+          companyName: String(mysqlUser.company_name || 'Empresa').trim(),
           createdAt: toMysqlDateTime(new Date()),
         };
         state.tenants.push(tenant);
