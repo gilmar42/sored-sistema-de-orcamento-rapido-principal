@@ -45,6 +45,13 @@ const AppContent: React.FC = () => {
     }
   }, [isAccessBlocked]);
 
+  useEffect(() => {
+    if (currentUser) {
+      setShowLandingAfterLogin(false);
+      setShowAuth(false);
+    }
+  }, [currentUser]);
+
   if (isLoading) return null;
   if (!currentUser) {
     if (showBlockedPaywall) {
