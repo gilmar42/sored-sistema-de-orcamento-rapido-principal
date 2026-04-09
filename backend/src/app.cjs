@@ -13,6 +13,7 @@ const paymentsRoutes = require('./routes/payment.cjs');
 // Configurações do Banco de Dados (Lazy loading)
 const db = require('./config/database');
 const { initDB } = require('./config/database_utils.cjs');
+const { syncFromMySQL } = require('./services/authFallbackStore.cjs');
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
@@ -117,6 +118,15 @@ async function startServer() {
         console.log('✅ Tabelas do Banco de Dados verificadas/criadas antes do boot.');
       }
     }
+
+    // Sync users from MySQL to fallback store on startup
+    try {
+      await syncFromMySQL(db);
+    } catch (syncError) {
+      console.error('⚠️ Falha na sincronização inicial com fallback store:', syncError.message);
+      // Don't fail startup if sync fails
+    }
+
   } catch (error) {
     console.error('⚠️ Inicialização automática do banco falhou.');
     console.error(error.message);

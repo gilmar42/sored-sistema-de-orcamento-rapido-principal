@@ -14,6 +14,7 @@ const {
   getRefreshToken,
   deleteRefreshToken,
   reconcileAccess: reconcileFallbackAccess,
+  syncFromMySQL,
 } = require('../services/authFallbackStore.cjs');
 const crypto = require('crypto');
 const { sendWelcomeEmail } = require('../services/emailService');
@@ -250,6 +251,7 @@ router.post('/signup', async (req, res) => {
 
     await ensureUserTrial(userId);
 
+    // Always mirror to fallback store for persistence across deployments
     try {
       await mirrorUserToFallbackStore({
         userId,
@@ -259,9 +261,8 @@ router.post('/signup', async (req, res) => {
         passwordHash,
       });
     } catch (fallbackError) {
-      if (fallbackError && fallbackError.code !== 'USER_EXISTS') {
-        console.error('Failed to mirror user to fallback auth store:', fallbackError);
-      }
+      console.error('Failed to mirror user to fallback auth store:', fallbackError);
+      // Don't fail signup if fallback fails, but log the error
     }
 
     // Send welcome email with tenant ID and user ID
@@ -334,17 +335,46 @@ router.post('/login', async (req, res) => {
     if (!normalizedEmail || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
-    const [users] = await db.query('SELECT * FROM users WHERE LOWER(TRIM(email)) = ?', [normalizedEmail]);
-    const user = users[0];
+
+    // Try MySQL first
+    let user = null;
+    let useFallback = false;
+
+    try {
+      const [users] = await db.query('SELECT * FROM users WHERE LOWER(TRIM(email)) = ?', [normalizedEmail]);
+      user = users[0];
+    } catch (dbError) {
+      console.log('MySQL unavailable for login, trying fallback store');
+      useFallback = true;
+    }
+
+    // If not found in MySQL or MySQL failed, try fallback
+    if (!user) {
+      try {
+        user = await findUserByEmail(normalizedEmail);
+        useFallback = true;
+      } catch (fallbackError) {
+        console.error('Fallback store access error:', fallbackError);
+      }
+    }
+
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    const isValidPassword = await bcrypt.compare(password, user.password_hash);
+
+    const isValidPassword = await bcrypt.compare(password, user.password_hash || user.passwordHash);
     if (!isValidPassword) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const access = await reconcileUserAccess(user.id);
+    // Get access control based on source
+    let access;
+    if (useFallback) {
+      access = await reconcileFallbackAccess(user.id);
+    } else {
+      access = await reconcileUserAccess(user.id);
+    }
+
     if (!access.allowed) {
       return res.status(403).json({
         error: 'Access blocked',
@@ -355,22 +385,29 @@ router.post('/login', async (req, res) => {
     }
 
     const token = jwt.sign(
-      { userId: user.id, email: normalizeEmail(user.email), tenantId: user.tenant_id },
+      { userId: user.id, email: normalizeEmail(user.email), tenantId: user.tenant_id ?? user.tenantId },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
     const refreshToken = generateRefreshToken();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
-    await db.query('INSERT INTO refresh_tokens (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)', [
-      `RT-${Date.now()}`, user.id, refreshToken, expiresAt
-    ]);
+
+    // Store refresh token in appropriate store
+    if (useFallback) {
+      await storeRefreshToken(user.id, refreshToken, expiresAt);
+    } else {
+      await db.query('INSERT INTO refresh_tokens (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)', [
+        `RT-${Date.now()}`, user.id, refreshToken, expiresAt
+      ]);
+    }
+
     res.cookie('token', token, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 });
     res.cookie('refreshToken', refreshToken, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
     return res.status(200).json({
       user: {
         id: user.id,
         email: normalizeEmail(user.email),
-        tenantId: user.tenant_id,
+        tenantId: user.tenant_id ?? user.tenantId,
       },
       access,
     });
@@ -520,5 +557,15 @@ router.post('/logout', async (req, res) => {
   }
 });
 
+// Sync users from MySQL to fallback store (admin endpoint)
+router.post('/sync-fallback', async (req, res) => {
+  try {
+    const syncedCount = await syncFromMySQL(db);
+    res.json({ success: true, syncedUsers: syncedCount });
+  } catch (error) {
+    console.error('Sync error:', error);
+    res.status(500).json({ error: 'Sync failed' });
+  }
+});
 
 module.exports = router;

@@ -340,28 +340,75 @@ async function reconcileAccess(userId) {
   };
 }
 
-function isDatabaseUnavailable(error) {
-  if (!error) return false;
-  const codes = new Set([
-    error.code,
-    error.cause?.code,
-    ...(Array.isArray(error.errors) ? error.errors.map((nestedError) => nestedError?.code) : []),
-  ].filter(Boolean));
-  const message = collectErrorMessages(error).join(' ').toLowerCase();
-  return codes.has('ECONNREFUSED') ||
-    codes.has('ETIMEDOUT') ||
-    codes.has('ENOTFOUND') ||
-    codes.has('EHOSTUNREACH') ||
-    codes.has('ER_ACCESS_DENIED_ERROR') ||
-    codes.has('ER_BAD_DB_ERROR') ||
-    codes.has('ER_NO_SUCH_TABLE') ||
-    codes.has('ER_NO_SUCH_DATABASE') ||
-    message.includes('econnrefused') ||
-    message.includes('connection refused') ||
-    message.includes('er_bad_db_error') ||
-    message.includes('er_no_such_table') ||
-    message.includes('er_no_such_database') ||
-    message.includes('protocol_connection_lost');
+async function syncFromMySQL(db) {
+  try {
+    console.log('🔄 Synchronizing users from MySQL to fallback store...');
+
+    // Get all users from MySQL
+    const [mysqlUsers] = await db.query(`
+      SELECT u.id, u.email, u.password_hash, u.tenant_id, u.name,
+             u.trial_started_at, u.trial_ends_at, u.access_status,
+             t.company_name
+      FROM users u
+      JOIN tenants t ON u.tenant_id = t.id
+    `);
+
+    const state = await loadState();
+    let syncedCount = 0;
+
+    for (const mysqlUser of mysqlUsers) {
+      const normalizedEmail = String(mysqlUser.email).trim().toLowerCase();
+
+      // Skip if already exists in fallback
+      const existingUser = state.users.find(u => String(u.email).trim().toLowerCase() === normalizedEmail);
+      if (existingUser) continue;
+
+      // Skip demo accounts
+      if (isDemoEmail(normalizedEmail) || isDemoCompanyName(mysqlUser.company_name)) continue;
+
+      // Create tenant if doesn't exist
+      let tenant = state.tenants.find(t => t.id === mysqlUser.tenant_id);
+      if (!tenant) {
+        tenant = {
+          id: mysqlUser.tenant_id,
+          companyName: String(mysqlUser.company_name || '').trim(),
+          createdAt: toMysqlDateTime(new Date()),
+        };
+        state.tenants.push(tenant);
+      }
+
+      // Add user to fallback
+      const userRecord = {
+        id: mysqlUser.id,
+        email: normalizedEmail,
+        passwordHash: mysqlUser.password_hash,
+        tenantId: mysqlUser.tenant_id,
+        tenant_id: mysqlUser.tenant_id,
+        name: mysqlUser.name || null,
+        trialStartedAt: mysqlUser.trial_started_at ? new Date(mysqlUser.trial_started_at).toISOString().slice(0, 19).replace('T', ' ') : null,
+        trial_started_at: mysqlUser.trial_started_at ? new Date(mysqlUser.trial_started_at).toISOString().slice(0, 19).replace('T', ' ') : null,
+        trialEndsAt: mysqlUser.trial_ends_at ? new Date(mysqlUser.trial_ends_at).toISOString().slice(0, 19).replace('T', ' ') : null,
+        trial_ends_at: mysqlUser.trial_ends_at ? new Date(mysqlUser.trial_ends_at).toISOString().slice(0, 19).replace('T', ' ') : null,
+        accessStatus: mysqlUser.access_status || 'trial',
+        access_status: mysqlUser.access_status || 'trial',
+      };
+
+      state.users.push(userRecord);
+      syncedCount++;
+    }
+
+    if (syncedCount > 0) {
+      await saveState(state);
+      console.log(`✅ Synchronized ${syncedCount} users from MySQL to fallback store`);
+    } else {
+      console.log('ℹ️ No new users to synchronize');
+    }
+
+    return syncedCount;
+  } catch (error) {
+    console.error('❌ Failed to sync from MySQL:', error);
+    throw error;
+  }
 }
 
 module.exports = {
@@ -377,4 +424,5 @@ module.exports = {
   ensureTrial,
   setAccessStatus,
   loadState,
+  syncFromMySQL,
 };
