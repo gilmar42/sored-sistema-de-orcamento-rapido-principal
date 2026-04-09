@@ -1,5 +1,39 @@
 {
-  "users": [],
-  "tenants": [],
-  "refreshTokens": []
+  "users": [
+    {
+      "id": "U-1775694812568-e09e6b",
+      "email": "testuser-1775694812@example.com",
+      "passwordHash": "$2b$10$u.a9cpmwHqfOCZ7TYdD6ru4XzLbz2LjMj9/l.h9tMAPlRvoG.gTBK",
+      "tenantId": "T-1775694812568-5b73eb",
+      "tenant_id": "T-1775694812568-5b73eb",
+      "name": null,
+      "trialStartedAt": "2026-04-09 00:33:32",
+      "trial_started_at": "2026-04-09 00:33:32",
+      "trialEndsAt": "2026-04-14 00:33:32",
+      "trial_ends_at": "2026-04-14 00:33:32",
+      "accessStatus": "trial",
+      "access_status": "trial"
+    }
+  ],
+  "tenants": [
+    {
+      "id": "T-1775694812568-5b73eb",
+      "companyName": "Test Company",
+      "createdAt": "2026-04-09 00:33:32"
+    }
+  ],
+  "refreshTokens": [
+    {
+      "id": "RT-1775694812587-5ecc51",
+      "userId": "U-1775694812568-e09e6b",
+      "token": "8f06371ca0a45f7a48e8a627ad181d5537308b072838c679037583da5370142f0621b8fc8b81a03c65c66b666b20924819a8464212a9cd5f2d9202fb25f81df5",
+      "expiresAt": "2026-05-09 00:33:32"
+    },
+    {
+      "id": "RT-1775694813259-e2ae0a",
+      "userId": "U-1775694812568-e09e6b",
+      "token": "98f67058fd4b37be5fa2cd3b416b94d3537066c8c5ae963a4ab9fd497cace645012b53bed20fd9cd39d4f8113e4562278bc7bd380aa829ae526d2bfdedd53ffa",
+      "expiresAt": "2026-05-09 00:33:33"
+    }
+  ]
 }

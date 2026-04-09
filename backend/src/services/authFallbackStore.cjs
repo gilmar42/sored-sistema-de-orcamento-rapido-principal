@@ -206,6 +206,51 @@ async function createTenantUserAndTrial(companyName, email, passwordHash) {
   };
 }
 
+async function mirrorUserToFallbackStore({ userId, tenantId, companyName, email, passwordHash }) {
+  const state = await loadState();
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const normalizedCompanyName = String(companyName || '').trim();
+
+  if (isDemoEmail(normalizedEmail) || isDemoCompanyName(normalizedCompanyName)) {
+    return null;
+  }
+
+  let tenant = state.tenants.find((entry) => entry.id === tenantId);
+  if (!tenant) {
+    tenant = {
+      id: tenantId,
+      companyName: normalizedCompanyName,
+      createdAt: toMysqlDateTime(new Date()),
+    };
+    state.tenants.push(tenant);
+  }
+
+  const existingUser = state.users.find((user) => String(user.email).trim().toLowerCase() === normalizedEmail);
+  if (existingUser) {
+    return normalizeUserRecord(existingUser);
+  }
+
+  const trial = createTrialWindow();
+  const userRecord = {
+    id: userId,
+    email: normalizedEmail,
+    passwordHash,
+    tenantId,
+    tenant_id: tenantId,
+    name: null,
+    trialStartedAt: trial.trialStartedAt,
+    trial_started_at: trial.trialStartedAt,
+    trialEndsAt: trial.trialEndsAt,
+    trial_ends_at: trial.trialEndsAt,
+    accessStatus: 'trial',
+    access_status: 'trial',
+  };
+
+  state.users.push(userRecord);
+  await saveState(state);
+  return normalizeUserRecord(userRecord);
+}
+
 async function findUserByEmail(email) {
   const state = await loadState();
   const normalizedEmail = String(email).trim().toLowerCase();
@@ -322,6 +367,7 @@ function isDatabaseUnavailable(error) {
 module.exports = {
   isDatabaseUnavailable,
   createTenantUserAndTrial,
+  mirrorUserToFallbackStore,
   findUserByEmail,
   findUserById,
   storeRefreshToken,

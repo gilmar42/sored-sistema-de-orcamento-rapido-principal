@@ -7,6 +7,7 @@ const { reconcileUserAccess, ensureUserTrial } = require('../services/accessCont
 const {
   isDatabaseUnavailable,
   createTenantUserAndTrial,
+  mirrorUserToFallbackStore,
   findUserByEmail,
   findUserById,
   storeRefreshToken,
@@ -155,7 +156,7 @@ async function handleFallbackLogin(req, res) {
   const { email, password } = req.body;
   const user = await findUserByEmail(normalizeEmail(email));
   if (!user) {
-    return res.status(401).json({ error: 'Invalid credentials' });
+    return res.status(503).json({ error: 'Database unavailable. Tente novamente em instantes.' });
   }
 
   const isValidPassword = await bcrypt.compare(password, user.passwordHash);
@@ -241,6 +242,20 @@ router.post('/signup', async (req, res) => {
     ]);
 
     await ensureUserTrial(userId);
+
+    try {
+      await mirrorUserToFallbackStore({
+        userId,
+        tenantId,
+        companyName: normalizedCompanyName,
+        email: normalizedEmail,
+        passwordHash,
+      });
+    } catch (fallbackError) {
+      if (fallbackError && fallbackError.code !== 'USER_EXISTS') {
+        console.error('Failed to mirror user to fallback auth store:', fallbackError);
+      }
+    }
 
     // Send welcome email with tenant ID and user ID
     sendWelcomeEmail({
