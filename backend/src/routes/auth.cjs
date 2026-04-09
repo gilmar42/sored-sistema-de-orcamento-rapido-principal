@@ -154,9 +154,16 @@ async function handleFallbackSignup(req, res) {
 
 async function handleFallbackLogin(req, res) {
   const { email, password } = req.body;
-  const user = await findUserByEmail(normalizeEmail(email));
-  if (!user) {
+  let user;
+  try {
+    user = await findUserByEmail(normalizeEmail(email));
+  } catch (fallbackError) {
+    console.error('Fallback store access error:', fallbackError);
     return res.status(503).json({ error: 'Database unavailable. Tente novamente em instantes.' });
+  }
+
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid credentials' });
   }
 
   const isValidPassword = await bcrypt.compare(password, user.passwordHash);
