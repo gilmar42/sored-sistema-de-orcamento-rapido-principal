@@ -383,13 +383,20 @@ router.post('/login', async (req, res) => {
     }
 
     if (!user) {
+      console.log(`❌ Login: Usuário ${normalizedEmail} não encontrado em lugar nenhum.`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const isValidPassword = await bcrypt.compare(password, user.password_hash || user.passwordHash);
+    console.log(`🔍 Verificando senha para usuário: ${normalizedEmail} (Fonte: ${useFallback ? 'Fallback' : 'MySQL'})`);
+    const storedHash = user.password_hash || user.passwordHash;
+    const isValidPassword = await bcrypt.compare(password, storedHash);
+    
     if (!isValidPassword) {
+      console.log(`❌ Login: Senha incorreta para ${normalizedEmail}`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+
+    console.log(`✅ Login: Sucesso para ${normalizedEmail}`);
 
     // Get access control based on source
     let access;
