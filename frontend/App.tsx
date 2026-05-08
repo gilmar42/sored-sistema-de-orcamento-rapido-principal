@@ -35,8 +35,26 @@ const AppContent: React.FC = () => {
 
   if (isLoading) return null;
 
+  // ── Usuário não autenticado ──
+  if (!currentUser) {
+    if (showAuth) {
+      return (
+        <>
+          <AuthPage initialView={authInitialView} />
+          <ToastContainer toasts={toasts} onCloseToast={removeToast} />
+        </>
+      );
+    }
+
+    return (
+      <DataProvider>
+        <LandingPage onGetStarted={() => setShowAuth(true)} />
+        <ToastContainer toasts={toasts} onCloseToast={removeToast} />
+      </DataProvider>
+    );
+  }
+
   // ── Usuário autenticado mas com acesso bloqueado (trial expirado) ──
-  // Mostrar paywall DENTRO da sessão autenticada para ter cookies válidos no pagamento
   if (currentUser && accessStatus === 'blocked') {
     return (
       <>
@@ -59,20 +77,10 @@ const AppContent: React.FC = () => {
   }
 
   // ── Usuário autenticado com acesso liberado ──
-  if (currentUser) {
-    return (
-      <DataProvider>
-        <MainLayout initialView={nextView} onOpenPlans={() => setShowPlans(true)} />
-        <PlansModal open={showPlans} onClose={() => setShowPlans(false)} prefillEmail={currentUser.email} />
-        <ToastContainer toasts={toasts} onCloseToast={removeToast} />
-      </DataProvider>
-    );
-  }
-
-  // ── Não autenticado ──
   return (
     <DataProvider>
       <MainLayout initialView={nextView} onOpenPlans={() => setShowPlans(true)} />
+      <PlansModal open={showPlans} onClose={() => setShowPlans(false)} prefillEmail={currentUser.email} />
       <ToastContainer toasts={toasts} onCloseToast={removeToast} />
     </DataProvider>
   );

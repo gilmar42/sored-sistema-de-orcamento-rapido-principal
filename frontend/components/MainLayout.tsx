@@ -136,46 +136,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ initialView, onOpenPlans }) => 
     }
   };
 
-  // Tela de login simples
-  if (!isLoading && !currentUser) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-ice-50 dark:bg-slate-900">
-        <form
-          className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-8 w-full max-w-sm flex flex-col gap-4"
-          onSubmit={async e => {
-            e.preventDefault();
-            setLoginState(s => ({ ...s, error: '' }));
-            const ok = await login(loginState.email, loginState.password);
-            if (!ok) setLoginState(s => ({ ...s, error: 'Credenciais inválidas' }));
-          }}
-        >
-          <h2 className="text-2xl font-bold text-center mb-2 text-blue-700 dark:text-blue-200">Login SORED</h2>
-          <input
-            type="email"
-            placeholder="E-mail"
-            className="rounded px-3 py-2 border border-gray-300 dark:bg-slate-700 dark:text-white"
-            value={loginState.email}
-            onChange={e => setLoginState(s => ({ ...s, email: e.target.value }))}
-            required
-          />
-          <input
-            type="password"
-            placeholder="Senha"
-            className="rounded px-3 py-2 border border-gray-300 dark:bg-slate-700 dark:text-white"
-            value={loginState.password}
-            onChange={e => setLoginState(s => ({ ...s, password: e.target.value }))}
-            required
-          />
-          {loginState.error && <div className="text-red-500 text-sm text-center">{loginState.error}</div>}
-          <button
-            type="submit"
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded transition-all"
-            disabled={isLoading}
-          >Entrar</button>
-        </form>
-      </div>
-    );
-  }
+  // Se não estiver logado, o MainLayout apenas renderiza a LandingPage ou o que for passado
+  // O controle de acesso agora é feito no App.tsx
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-ice-50 dark:bg-slate-900 transition-all duration-300 ease-in-out">
