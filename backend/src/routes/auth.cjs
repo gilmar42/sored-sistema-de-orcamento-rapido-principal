@@ -217,8 +217,32 @@ router.post('/signup', async (req, res) => {
 
     // Check if user exists
     const [existingUsers] = await db.query('SELECT * FROM users WHERE LOWER(TRIM(email)) = ?', [normalizedEmail]);
+    
     if (existingUsers.length > 0) {
-      return res.status(400).json({ error: 'User already exists' });
+      // Se o usuário já existe, vamos permitir que ele "atualize" a conta se for o mesmo e-mail
+      // Isso ajuda a recuperar o acesso se houver erro de credenciais
+      console.log(`ℹ️ Usuário ${normalizedEmail} já existe. Atualizando senha...`);
+      const passwordHash = await bcrypt.hash(password, 10);
+      await db.query('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, existingUsers[0].id]);
+      
+      const userId = existingUsers[0].id;
+      const tenantId = existingUsers[0].tenant_id;
+      const access = await reconcileUserAccess(userId);
+      
+      const token = jwt.sign({ userId, email: normalizedEmail, tenantId }, JWT_SECRET, { expiresIn: '7d' });
+      const refreshToken = generateRefreshToken();
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+      
+      await db.query('INSERT INTO refresh_tokens (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)', [
+        `RT-${Date.now()}`, userId, refreshToken, expiresAt
+      ]);
+
+      issueSession(res, token, refreshToken);
+      return res.status(200).json({
+        user: { id: userId, email: normalizedEmail, tenantId },
+        access,
+        message: 'Senha atualizada e login realizado com sucesso.'
+      });
     }
 
     // Create tenant
