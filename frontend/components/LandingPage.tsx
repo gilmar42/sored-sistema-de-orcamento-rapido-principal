@@ -78,13 +78,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onOpenPl
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.25em] text-blue-200">Teste grátis de 5 dias</p>
               <p className="text-sm text-blue-50/90">
-                Acesso completo e ilimitado, com cobrança automática ao final do período e cancelamento antes do vencimento.
+                Acesso completo e ilimitado. Comece agora sem compromisso.
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-sm font-semibold text-emerald-200">
-            <CheckCircleIcon className="h-5 w-5" />
-            Risco zero para começar
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={onGetStarted}
+              className="text-sm font-bold text-white hover:text-blue-200 transition-colors cursor-pointer"
+            >
+              Já tem uma conta? Entrar
+            </button>
+            <div className="hidden sm:flex items-center gap-2 text-sm font-semibold text-emerald-200">
+              <CheckCircleIcon className="h-5 w-5" />
+              Risco zero
+            </div>
           </div>
         </div>
       </div>
