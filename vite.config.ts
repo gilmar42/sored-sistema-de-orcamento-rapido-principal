@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '.', '');
+    const env = loadEnv(mode, path.resolve(__dirname, 'frontend'), '');
     const isProd = mode === 'production';
     const definedEnv = Object.fromEntries(
       Object.entries(env)
@@ -15,6 +15,7 @@ export default defineConfig(({ mode }) => {
 
     return {
       root: 'frontend',
+      envDir: path.resolve(__dirname, 'frontend'),
       define: definedEnv,
       server: {
         port: 3000,
