@@ -25,9 +25,6 @@ const cookieOptions = {
   secure: isProduction,
   path: '/',
 };
-const DEMO_EMAIL_SUFFIX = '@sored.demo';
-const DEMO_COMPANY_NAMES = new Set(['Empresa Demo', 'Debug Teste']);
-
 const router = express.Router();
 
 // Utilitário para gerar refresh token seguro
@@ -84,10 +81,6 @@ function isDatabaseUnavailableError(error) {
     error?.errno === -111 ||
     /connect ECONNREFUSED|can't connect to mysql server|server has gone away|lost connection to mysql server|er_bad_db_error|er_access_denied_error|er_no_such_table|er_no_such_database|protocol_connection_lost/i.test(messages)
   );
-}
-
-function isDemoSignup(email, companyName) {
-  return normalizeEmail(email).endsWith(DEMO_EMAIL_SUFFIX) || DEMO_COMPANY_NAMES.has(normalizeCompanyName(companyName));
 }
 
 function buildUserResponse(user) {
@@ -211,10 +204,6 @@ router.post('/signup', async (req, res) => {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
-    if (isProduction && isDemoSignup(normalizedEmail, normalizedCompanyName)) {
-      return res.status(400).json({ error: 'Demo accounts are not allowed in production' });
-    }
-
     // Check if user exists
     const [existingUsers] = await db.query('SELECT * FROM users WHERE LOWER(TRIM(email)) = ?', [normalizedEmail]);
     
@@ -326,9 +315,7 @@ router.post('/signup', async (req, res) => {
       access,
     });
   } catch (error) {
-    if (error && error.code === 'DEMO_ACCOUNT') {
-      return res.status(400).json({ error: 'Demo accounts are not allowed in production' });
-    }
+
     if (canUseFallbackAuth(error)) {
       try {
         return await handleFallbackSignup(req, res);
@@ -376,53 +363,88 @@ router.post('/login', async (req, res) => {
     if (!user) {
       try {
         user = await findUserByEmail(normalizedEmail);
-        useFallback = true;
+        if (user) {
+          console.log(`ℹ️ Login: Usuário ${normalizedEmail} encontrado apenas no Fallback Store.`);
+          useFallback = true;
+        }
       } catch (fallbackError) {
-        console.error('Fallback store access error:', fallbackError);
+        console.error('❌ Login: Erro ao acessar Fallback Store:', fallbackError.message);
       }
     }
 
     if (!user) {
-      console.log(`❌ Login: Usuário ${normalizedEmail} não encontrado em lugar nenhum.`);
-      return res.status(401).json({ error: 'Invalid credentials' });
+      console.log(`❌ Login: Usuário ${normalizedEmail} não encontrado (MySQL e Fallback).`);
+      return res.status(401).json({ error: 'Invalid credentials', detail: 'User not found' });
     }
 
-    console.log(`🔍 Verificando senha para usuário: ${normalizedEmail} (Fonte: ${useFallback ? 'Fallback' : 'MySQL'})`);
+    console.log(`🔍 Login: Verificando senha para ${normalizedEmail} (Fonte: ${useFallback ? 'Fallback' : 'MySQL'})`);
     const storedHash = user.password_hash || user.passwordHash;
+    
+    if (!storedHash) {
+        console.error(`❌ Login: Hash de senha ausente para ${normalizedEmail}`);
+        return res.status(401).json({ error: 'Invalid credentials', detail: 'Password hash missing' });
+    }
+
     const isValidPassword = await bcrypt.compare(password, storedHash);
     
     if (!isValidPassword) {
       console.log(`❌ Login: Senha incorreta para ${normalizedEmail}`);
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: 'Invalid credentials', detail: 'Password mismatch' });
     }
 
     console.log(`✅ Login: Sucesso para ${normalizedEmail}`);
 
-    // Get access control based on source
-    let access;
+    // --- AUTO-REPAIR: Se o usuário estava apenas no fallback, tentar restaurar no MySQL ---
     if (useFallback) {
-      access = await reconcileFallbackAccess(user.id);
-    } else {
-      access = await reconcileUserAccess(user.id);
+        try {
+            const [checkMySQL] = await db.query('SELECT id FROM users WHERE id = ? OR email = ?', [user.id, normalizedEmail]);
+            if (checkMySQL.length === 0) {
+                console.log(`🛠️ Auto-Repair: Restaurando usuário ${normalizedEmail} no MySQL...`);
+                // Tenta criar o tenant se não existir
+                const tenantId = user.tenant_id || user.tenantId;
+                await db.query('INSERT IGNORE INTO tenants (id, company_name) VALUES (?, ?)', [tenantId, 'Empresa Restaurada']);
+                // Restaura o usuário
+                await db.query('INSERT INTO users (id, email, password_hash, tenant_id, access_status) VALUES (?, ?, ?, ?, ?)', [
+                    user.id, normalizedEmail, storedHash, tenantId, user.accessStatus || 'trial'
+                ]);
+                console.log(`✅ Auto-Repair: Usuário ${normalizedEmail} restaurado com sucesso no MySQL.`);
+            }
+        } catch (repairError) {
+            console.warn(`⚠️ Auto-Repair: Não foi possível sincronizar ${normalizedEmail} com MySQL:`, repairError.message);
+        }
     }
 
-    // Não bloquear o login — o frontend gerencia o paywall com base no accessStatus
+    // Get access control based on source
+    let access;
+    try {
+      if (useFallback) {
+        access = await reconcileFallbackAccess(user.id);
+      } else {
+        access = await reconcileUserAccess(user.id);
+      }
+    } catch (accessError) {
+        console.warn(`⚠️ Erro ao reconciliar acesso para ${normalizedEmail}:`, accessError.message);
+        access = { allowed: true, accessStatus: 'trial' };
+    }
 
     const token = jwt.sign(
-      { userId: user.id, email: normalizeEmail(user.email), tenantId: user.tenant_id ?? user.tenantId },
+      { userId: user.id, email: normalizedEmail, tenantId: user.tenant_id ?? user.tenantId },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
     const refreshToken = generateRefreshToken();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
 
-    // Store refresh token in appropriate store
-    if (useFallback) {
-      await storeRefreshToken(user.id, refreshToken, expiresAt);
-    } else {
-      await db.query('INSERT INTO refresh_tokens (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)', [
-        `RT-${Date.now()}`, user.id, refreshToken, expiresAt
-      ]);
+    try {
+        if (useFallback) {
+          await storeRefreshToken(user.id, refreshToken, expiresAt);
+        } else {
+          await db.query('INSERT INTO refresh_tokens (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)', [
+            `RT-${Date.now()}`, user.id, refreshToken, expiresAt
+          ]);
+        }
+    } catch (tokenError) {
+        console.warn('⚠️ Falha ao salvar Refresh Token:', tokenError.message);
     }
 
     res.cookie('token', token, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 });
@@ -430,15 +452,13 @@ router.post('/login', async (req, res) => {
     return res.status(200).json({
       user: {
         id: user.id,
-        email: normalizeEmail(user.email),
+        email: normalizedEmail,
         tenantId: user.tenant_id ?? user.tenantId,
       },
       access,
     });
   } catch (error) {
-    if (error && error.code === 'DEMO_ACCOUNT') {
-      return res.status(400).json({ error: 'Demo accounts are not allowed in production' });
-    }
+
     if (canUseFallbackAuth(error)) {
       try {
         return await handleFallbackLogin(req, res);

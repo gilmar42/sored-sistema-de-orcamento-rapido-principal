@@ -3,10 +3,6 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 
 const STORE_PATH = path.resolve(__dirname, '..', '..', 'data', 'auth-fallback.json');
-const DEMO_EMAILS = new Set(['debugteste@example.com']);
-const DEMO_EMAIL_SUFFIX = '@sored.demo';
-const DEMO_COMPANY_NAMES = new Set(['Empresa Demo', 'Debug Teste']);
-
 const EMPTY_STATE = {
   users: [],
   tenants: [],
@@ -65,17 +61,6 @@ function generateId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 }
 
-function isDemoEmail(email) {
-  if (!email) return false;
-  const normalized = String(email).trim().toLowerCase();
-  return DEMO_EMAILS.has(normalized) || normalized.endsWith(DEMO_EMAIL_SUFFIX);
-}
-
-function isDemoCompanyName(companyName) {
-  if (!companyName) return false;
-  return DEMO_COMPANY_NAMES.has(String(companyName).trim());
-}
-
 function normalizeUserRecord(user) {
   if (!user) return null;
   return {
@@ -93,30 +78,9 @@ function sanitizeState(state) {
   const tenants = Array.isArray(state.tenants) ? state.tenants : [];
   const refreshTokens = Array.isArray(state.refreshTokens) ? state.refreshTokens : [];
 
-  const tenantIdsToRemove = new Set();
-  for (const tenant of tenants) {
-    if (isDemoCompanyName(tenant.companyName)) {
-      tenantIdsToRemove.add(tenant.id);
-    }
-  }
-
-  const cleanedUsers = users.filter((user) => {
-    const normalized = normalizeUserRecord(user);
-    const shouldRemove = isDemoEmail(normalized?.email) || tenantIdsToRemove.has(normalized?.tenantId);
-    if (shouldRemove && normalized?.tenantId) {
-      tenantIdsToRemove.add(normalized.tenantId);
-    }
-    return !shouldRemove;
-  });
-
-  const cleanedTenants = tenants.filter(
-    (tenant) => !tenantIdsToRemove.has(tenant.id) && !isDemoCompanyName(tenant.companyName)
-  );
-
-  const cleanedRefreshTokens = refreshTokens.filter((token) => {
-    const linkedUser = cleanedUsers.find((user) => user.id === token.userId);
-    return Boolean(linkedUser) && !isDemoEmail(linkedUser.email);
-  });
+  const cleanedUsers = users.map((user) => normalizeUserRecord(user)).filter(Boolean);
+  const cleanedTenants = tenants;
+  const cleanedRefreshTokens = refreshTokens;
 
   return {
     users: cleanedUsers,
@@ -159,11 +123,6 @@ function collectErrorMessages(error, seen = new Set()) {
 
 async function createTenantUserAndTrial(companyName, email, passwordHash) {
   const state = await loadState();
-  if (isDemoEmail(email) || isDemoCompanyName(companyName)) {
-    const error = new Error('Demo accounts are not allowed');
-    error.code = 'DEMO_ACCOUNT';
-    throw error;
-  }
   const normalizedEmail = String(email).trim().toLowerCase();
   const existingUser = state.users.find((user) => String(user.email).trim().toLowerCase() === normalizedEmail);
   if (existingUser) {
@@ -210,10 +169,6 @@ async function mirrorUserToFallbackStore({ userId, tenantId, companyName, email,
   const state = await loadState();
   const normalizedEmail = String(email).trim().toLowerCase();
   const normalizedCompanyName = String(companyName || '').trim();
-
-  if (isDemoEmail(normalizedEmail) || isDemoCompanyName(normalizedCompanyName)) {
-    return null;
-  }
 
   let tenant = state.tenants.find((entry) => entry.id === tenantId);
   if (!tenant) {
@@ -386,9 +341,6 @@ async function syncFromMySQL(db) {
       // Skip if already exists in fallback
       const existingUser = state.users.find(u => String(u.email).trim().toLowerCase() === normalizedEmail);
       if (existingUser) continue;
-
-      // Skip demo accounts
-      if (isDemoEmail(normalizedEmail) || isDemoCompanyName(mysqlUser.company_name)) continue;
 
       // Create tenant if doesn't exist
       let tenant = state.tenants.find(t => t.id === mysqlUser.tenant_id);
