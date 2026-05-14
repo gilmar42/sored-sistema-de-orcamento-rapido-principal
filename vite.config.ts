@@ -5,17 +5,29 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, path.resolve(__dirname, 'frontend'), '');
+    const frontendDir = path.resolve(__dirname, 'frontend');
+    const env = loadEnv(mode, frontendDir, '');
+    
+    // Diagnóstico durante o build
+    console.log('\n--- 🛠️ VITE BUILD DIAGNOSTICS ---');
+    console.log(`📍 Mode: ${mode}`);
+    console.log(`📍 Frontend Dir: ${frontendDir}`);
+    console.log(`✅ MP Key Found: ${env.VITE_MP_PUBLIC_KEY ? 'YES (' + env.VITE_MP_PUBLIC_KEY.slice(0, 10) + '...)' : '❌ NO'}`);
+    console.log('--------------------------------\n');
+
     const isProd = mode === 'production';
     const definedEnv = Object.fromEntries(
       Object.entries(env)
         .filter(([key]) => key.startsWith('VITE_'))
-        .map(([key, value]) => [`process.env.${key}`, JSON.stringify(value)])
+        .flatMap(([key, value]) => [
+          [`process.env.${key}`, JSON.stringify(value)],
+          [`import.meta.env.${key}`, JSON.stringify(value)]
+        ])
     );
 
     return {
       root: 'frontend',
-      envDir: path.resolve(__dirname, 'frontend'),
+      envDir: frontendDir,
       define: definedEnv,
       server: {
         port: 3000,
