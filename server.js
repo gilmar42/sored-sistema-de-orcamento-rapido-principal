@@ -12,6 +12,24 @@ const app = require('./backend/src/app.cjs');
 const { initDB } = require('./backend/src/config/database_utils.cjs');
 const isProduction = process.env.NODE_ENV === 'production';
 
+// Verificação de Variáveis de Ambiente (Pre-flight)
+function validateEnv() {
+    const required = ['JWT_SECRET', 'DB_USER', 'DB_NAME', 'DB_HOST'];
+    const missing = required.filter(key => !process.env[key]);
+    
+    console.log('--- SYSTEM PRE-FLIGHT CHECK ---');
+    if (missing.length > 0) {
+        console.warn(`⚠️ AVISO: Variáveis críticas ausentes: ${missing.join(', ')}`);
+        console.warn('DICA: Verifique se o arquivo .env está no lugar correto ou se as variáveis foram setadas no hPanel.');
+    }
+    
+    if (!process.env.DB_PASSWORD && !process.env.DB_PASS) {
+        console.warn('⚠️ AVISO: DB_PASSWORD não detectado. A conexão MySQL provavelmente falhará.');
+    }
+    
+    console.log('--- PRE-FLIGHT COMPLETE ---');
+}
+
 // Configura o servidor Express (que já está rodando a API) para TAMBÉM servir o Frontend
 
 // O Output Directory definido para a Hostinger é a pasta 'dist' gerada pelo Vite dentro do frontend
@@ -99,6 +117,7 @@ const PORT = process.env.PORT || 9000;
 
 async function startServer() {
     try {
+        validateEnv();
         if (typeof initDB === 'function') {
             await initDB();
             if (!isProduction) {
@@ -106,18 +125,21 @@ async function startServer() {
             }
         }
     } catch (e) {
-        console.error('⚠️ Inicialização automática do banco falhou.');
-        console.error(e.message);
-        if (isProduction) {
-            process.exit(1);
-        }
+        console.error('❌ ERRO CRÍTICO NA INICIALIZAÇÃO DO BANCO:');
+        console.error(`> ${e.message}`);
+        console.error('⚠️ O SISTEMA ENTRARÁ EM MODO DEGRADADO (USANDO APENAS FALLBACK AUTH).');
+        console.error('⚠️ Resolva os problemas de conexão para restaurar a funcionalidade total.');
+        
+        // Em vez de process.exit(1), permitimos que o servidor suba para que o usuário possa acessar os logs
+        // e possivelmente usar o sistema via fallback store se houver dados lá.
     }
 
     app.listen(PORT, () => {
-        if (!isProduction) {
-            console.log(`🚀 Unified Server running on http://localhost:${PORT}`);
-            console.log(`✅ Server.js carregado: Unificando Backend e Frontend na mesma porta para deploy!`);
-        }
+        const url = isProduction ? 'Produção' : `http://localhost:${PORT}`;
+        console.log(`🚀 Unified Server running on ${url}`);
+        console.log(`✅ Status: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`);
+        console.log(`✅ Frontend: ${distPath}`);
+        console.log(`💡 DICA: Para persistir usuários em falhas de banco, não apague a pasta 'backend/data' durante o deploy.`);
     });
 }
 

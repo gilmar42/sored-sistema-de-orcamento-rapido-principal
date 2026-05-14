@@ -240,10 +240,21 @@ async function initDB() {
       console.error('❌ ERRO CRÍTICO NA INICIALIZAÇÃO DO BANCO:');
       console.error(`- Código: ${error.code}`);
       console.error(`- Mensagem: ${error.message}`);
-      console.error(`- Host: ${process.env.DB_HOST}`);
-      console.error(`- Usuário: ${process.env.DB_USER}`);
-      console.error(`- Banco: ${process.env.DB_NAME}`);
-      console.error('DICA: Na Hostinger, certifique-se de que o banco e o usuário foram criados no hPanel.');
+      console.error(`- Host Detectado: ${process.env.DB_HOST || 'Não definido'}`);
+      console.error(`- Usuário Detectado: ${process.env.DB_USER || 'Não definido'}`);
+      console.error(`- Banco Detectado: ${process.env.DB_NAME || 'Não definido'}`);
+      
+      if (error.code === 'ER_ACCESS_DENIED_ERROR') {
+          console.error('💡 DICA: Senha do banco rejeitada ou usuário incorreto.');
+      } else if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+          console.error(`💡 DICA: Não foi possível alcançar o host '${process.env.DB_HOST}'.`);
+          console.error('   Na Hostinger, o host pode ser "localhost" ou um endereço específico no seu hPanel.');
+      }
+      
+      if (isProduction) {
+          console.error('⚠️ ALERTA: O sistema continuará em modo degradado para evitar queda total.');
+      }
+      throw error;
     }
   } finally {
     if (connection) connection.release();
