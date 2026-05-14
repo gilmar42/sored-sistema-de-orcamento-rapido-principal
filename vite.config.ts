@@ -21,7 +21,8 @@ export default defineConfig(({ mode }) => {
         .filter(([key]) => key.startsWith('VITE_'))
         .flatMap(([key, value]) => [
           [`process.env.${key}`, JSON.stringify(value)],
-          [`import.meta.env.${key}`, JSON.stringify(value)]
+          [`import.meta.env.${key}`, JSON.stringify(value)],
+          [`window.${key}`, JSON.stringify(value)]
         ])
     );
 

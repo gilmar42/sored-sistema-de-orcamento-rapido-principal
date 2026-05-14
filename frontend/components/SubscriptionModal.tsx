@@ -21,7 +21,8 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ open, onClose, pr
     docType: 'CPF',
     docNumber: '',
   });
-  const mpKey = (import.meta.env.VITE_MP_PUBLIC_KEY as string) || '';
+  const mpKey = (import.meta.env.VITE_MP_PUBLIC_KEY || (window as any).VITE_MP_PUBLIC_KEY || '') as string;
+  console.log(`[SubscriptionModal] MP Key status: ${mpKey ? 'Present (' + mpKey.slice(0, 10) + '...)' : 'MISSING'}`);
   const mp = useMercadoPago(mpKey);
   const formRef = useRef<HTMLFormElement>(null);
   const [loading, setLoading] = useState(false);
