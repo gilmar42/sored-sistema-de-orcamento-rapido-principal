@@ -422,6 +422,8 @@ router.post('/subscriptions', async (req, res) => {
     };
     const { preApproval } = getMP();
     const result = await preApproval.create({ body });
+    console.log(`✅ [Subscription Success]: ID ${result.id} para ${email}`);
+
     // Salva assinatura no banco
     const nextBillRaw = result.auto_recurring?.next_payment_date;
     const nextBilling = nextBillRaw ? formatDT(nextBillRaw) : null;
@@ -440,7 +442,23 @@ router.post('/subscriptions', async (req, res) => {
     const [sRows] = await db.query('SELECT * FROM subscriptions WHERE id = ?', [rs.insertId]);
     res.status(201).json(sRows[0]);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('❌ [Subscription Error]:', error.message);
+    const fs = require('fs');
+    
+    let detailedError = error.message;
+    if (error.response) {
+        detailedError = JSON.stringify(error.response, null, 2);
+        console.error('📋 Detalhes MP:', detailedError);
+    }
+
+    const logEntry = `\n[${new Date().toISOString()}] SUBSCRIPTION_FAIL: ${email} | Plan: ${planType} | Error: ${detailedError}\n`;
+    fs.appendFileSync('mp_subscription_errors.log', logEntry);
+
+    res.status(error.response?.status || 500).json({ 
+        error: 'Erro ao processar assinatura com cartão',
+        message: error.message,
+        details: error.response || null
+    });
   }
 });
 
