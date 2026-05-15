@@ -42,8 +42,8 @@ interface AuthContextType {
   authError: string | null;
   accessStatus: AccessStatus;
   trialStartedAt: string | null;
-  trialEndsAt: string | null;
   blockReason: string | null;
+  refreshAccess: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -80,6 +80,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setCurrentUser(null);
     applyAccess(null);
     return false;
+  };
+
+  const refreshAccess = async () => {
+    try {
+      const data = await apiService.verifyToken();
+      setSession(data);
+    } catch (error) {
+      console.error('Failed to refresh access:', error);
+    }
   };
 
   useEffect(() => {
@@ -177,6 +186,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       trialStartedAt: access.trialStartedAt,
       trialEndsAt: access.trialEndsAt,
       blockReason: access.blockReason,
+      refreshAccess,
     }}>
       {children}
     </AuthContext.Provider>

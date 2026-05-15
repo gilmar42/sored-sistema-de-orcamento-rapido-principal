@@ -1,17 +1,25 @@
-import React from 'react';
-import { CheckCircleIcon, RocketLaunchIcon, SparklesIcon } from './Icons';
+import { CheckCircleIcon, RocketLaunchIcon, SparklesIcon, ArrowPathIcon, HomeIcon } from './Icons';
+import { useAuth } from '../context/AuthContext';
 
 interface TrialPaywallProps {
   onSubscribe: () => void;
-  onTryAnotherAccount: () => void;
+  onGoHome: () => void;
   trialDays?: number;
 }
 
 export const TrialPaywall: React.FC<TrialPaywallProps> = ({
   onSubscribe,
-  onTryAnotherAccount,
+  onGoHome,
   trialDays = 5,
 }) => {
+  const { refreshAccess, logout } = useAuth();
+  const [verifying, setVerifying] = React.useState(false);
+
+  const handleVerify = async () => {
+    setVerifying(true);
+    await refreshAccess();
+    setTimeout(() => setVerifying(false), 1000);
+  };
   const highlights = [
     'Acesso completo e ilimitado ao sistema',
     'Automação para reduzir retrabalho e desorganização',
@@ -66,10 +74,20 @@ export const TrialPaywall: React.FC<TrialPaywallProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={onTryAnotherAccount}
+                  onClick={handleVerify}
+                  disabled={verifying}
+                  className="inline-flex items-center justify-center rounded-2xl border border-blue-400/30 bg-blue-500/10 px-6 py-4 text-base font-semibold text-blue-100 transition-all hover:bg-blue-500/20 disabled:opacity-50"
+                >
+                  <ArrowPathIcon className={`mr-2 h-5 w-5 ${verifying ? 'animate-spin' : ''}`} />
+                  {verifying ? 'Verificando...' : 'Verificar Pagamento'}
+                </button>
+                <button
+                  type="button"
+                  onClick={onGoHome}
                   className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-6 py-4 text-base font-semibold text-white transition-colors hover:bg-white/10"
                 >
-                  Entrar com outra conta
+                  <HomeIcon className="mr-2 h-5 w-5" />
+                  Voltar para o Início
                 </button>
               </div>
 

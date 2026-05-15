@@ -27,6 +27,9 @@ const AppContent: React.FC = () => {
       setPaymentStatus(payment);
       if (payment === 'success') {
         setShowAuth(true);
+      } else if (payment === 'failure') {
+        // Se falhou, garantir que o usuário veja a landing page ou uma mensagem clara
+        setShowAuth(false);
       }
       // Clean URL
       window.history.replaceState({}, '', window.location.pathname);
@@ -48,7 +51,10 @@ const AppContent: React.FC = () => {
 
     return (
       <DataProvider>
-        <LandingPage onGetStarted={() => setShowAuth(true)} />
+        <LandingPage 
+          onGetStarted={() => setShowAuth(true)} 
+          paymentStatus={paymentStatus}
+        />
         <ToastContainer toasts={toasts} onCloseToast={removeToast} />
       </DataProvider>
     );
@@ -60,10 +66,10 @@ const AppContent: React.FC = () => {
       <>
         <TrialPaywall
           onSubscribe={() => setShowPlans(true)}
-          onTryAnotherAccount={async () => {
+          onGoHome={async () => {
             await logout();
-            setAuthInitialView('login');
-            setShowAuth(true);
+            setShowAuth(false);
+            setPaymentStatus(null);
           }}
         />
         <PlansModal

@@ -67,6 +67,10 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ open, onClose, pr
       setCardToken(tokenResult.id);
       const res = await createSubscription({ email, token: tokenResult.id, planType: selected! });
       setResult(res);
+      // Recarregar após 2 segundos para liberar o acesso
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
     } catch (e: any) {
       setError(e.message || 'Erro ao assinar');
     } finally {
@@ -104,12 +108,27 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ open, onClose, pr
         <button className="w-full bg-green-600 text-white py-2 rounded mt-2" disabled={!selected||!email||!card.number||!card.holder||!card.exp||!card.cvv||!card.docNumber||loading} onClick={handleSubscribe}>
           {loading ? 'Processando...' : 'Assinar'}
         </button>
-        {error && <div className="text-red-600 mt-2">{error}</div>}
-        {result && <div className="text-green-600 mt-2">Assinatura criada! ID: {result._id}</div>}
-        <button className="mt-4 text-gray-500 underline" onClick={onClose}>Fechar</button>
+        {error && <div className="text-red-600 mt-2 p-2 bg-red-50 rounded border border-red-200 text-sm">{error}</div>}
+        {result && (
+          <div className="text-green-600 mt-2 p-3 bg-green-50 rounded border border-green-200 text-sm flex items-center gap-2">
+            <CheckCircleIcon className="w-5 h-5" />
+            <div>
+              <p className="font-bold">Assinatura criada!</p>
+              <p>Redirecionando para o sistema...</p>
+            </div>
+          </div>
+        )}
+        <button className="mt-4 text-gray-500 underline text-sm w-full" onClick={onClose} disabled={loading}>Fechar</button>
       </div>
     </div>
   );
 };
+
+// Pequeno componente de ícone para uso interno se não quiser importar
+const CheckCircleIcon = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
 
 export default SubscriptionModal;
