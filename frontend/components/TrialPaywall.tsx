@@ -1,3 +1,4 @@
+import React from 'react';
 import { CheckCircleIcon, RocketLaunchIcon, SparklesIcon, ArrowPathIcon, HomeIcon } from './Icons';
 import { useAuth } from '../context/AuthContext';
 
