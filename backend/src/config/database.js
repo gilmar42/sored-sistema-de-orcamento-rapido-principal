@@ -26,6 +26,7 @@ function getPool() {
       password: dbPass,
       database: dbName,
       port: process.env.DB_PORT || 3306,
+      timezone: 'Z',
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0

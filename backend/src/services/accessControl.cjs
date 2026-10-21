@@ -3,16 +3,23 @@ const db = require('../config/database');
 const TRIAL_DAYS = 5;
 
 const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['authorized', 'active', 'paid', 'approved']);
-const GRACE_SUBSCRIPTION_STATUSES = new Set(['pending', 'failure']);
 
 function toMysqlDateTime(date) {
   return date.toISOString().slice(0, 19).replace('T', ' ');
 }
 
-function isFuture(datetime) {
+function parseDatabaseDateTime(datetime) {
+  if (datetime instanceof Date) return datetime;
+  if (typeof datetime === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(datetime)) {
+    return new Date(`${datetime.replace(' ', 'T')}Z`);
+  }
+  return new Date(datetime);
+}
+
+function isFuture(datetime, now = Date.now()) {
   if (!datetime) return false;
-  const value = new Date(datetime);
-  return !Number.isNaN(value.getTime()) && value.getTime() > Date.now();
+  const value = parseDatabaseDateTime(datetime);
+  return !Number.isNaN(value.getTime()) && value.getTime() > now;
 }
 
 async function ensureUserTrial(userId) {
@@ -56,12 +63,11 @@ function evaluateSubscriptionAccess(subscription, now = new Date()) {
     return { allowed: false, status: 'none', reason: 'no_subscription' };
   }
 
-  if (ACTIVE_SUBSCRIPTION_STATUSES.has(subscription.status)) {
+  if (
+    ACTIVE_SUBSCRIPTION_STATUSES.has(subscription.status) &&
+    isFuture(subscription.nextBilling ?? subscription.next_billing, now.getTime())
+  ) {
     return { allowed: true, status: 'paid', reason: null };
-  }
-
-  if (GRACE_SUBSCRIPTION_STATUSES.has(subscription.status) && isFuture(subscription.gracePeriodUntil)) {
-    return { allowed: true, status: 'grace', reason: null };
   }
 
   return { allowed: false, status: subscription.status || 'unknown', reason: 'subscription_inactive' };
@@ -75,8 +81,8 @@ async function reconcileUserAccess(userId) {
   const user = await ensureUserTrial(userId);
   const subscription = await getLatestSubscriptionForUser(userId);
   const subscriptionAccess = evaluateSubscriptionAccess(subscription);
-  const trialEndsAt = user.trial_ends_at ? new Date(user.trial_ends_at) : null;
-  const trialActive = trialEndsAt ? trialEndsAt.getTime() >= Date.now() : false;
+  const trialEndsAt = user.trial_ends_at ? parseDatabaseDateTime(user.trial_ends_at) : null;
+  const trialActive = trialEndsAt ? trialEndsAt.getTime() > Date.now() : false;
 
   let allowed = false;
   let accessStatus = 'blocked';
@@ -108,6 +114,7 @@ async function reconcileUserAccess(userId) {
 module.exports = {
   TRIAL_DAYS,
   ensureUserTrial,
+  parseDatabaseDateTime,
   reconcileUserAccess,
   setUserAccessStatus,
   evaluateSubscriptionAccess,

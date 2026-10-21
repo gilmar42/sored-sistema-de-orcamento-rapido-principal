@@ -19,7 +19,8 @@ interface Plan {
 }
 
 const PlansModal: React.FC<PlansModalProps> = ({ open, onClose, prefillEmail = '' }) => {
-  const { currentUser, accessStatus, trialEndsAt } = useAuth();
+  const { currentUser, accessStatus } = useAuth();
+  const accountEmail = prefillEmail || currentUser?.email || '';
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,17 +70,30 @@ const PlansModal: React.FC<PlansModalProps> = ({ open, onClose, prefillEmail = '
   useEffect(() => {
     if (open) {
       loadPlans();
-      if (prefillEmail) {
-        setPixEmail(prefillEmail);
+      if (accountEmail) {
+        setPixEmail(accountEmail);
       }
     }
-  }, [open, prefillEmail]);
+  }, [open, accountEmail]);
 
   const loadPlans = async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await getPlans();
+      if (data?.monthlyPlan && data?.annualPlan) {
+        setPlans([
+          {
+            ...defaultPlans[0],
+            price: Number(data.monthlyPlan.price),
+          },
+          {
+            ...defaultPlans[1],
+            price: Number(data.annualPlan.price),
+          },
+        ]);
+        return;
+      }
       if (data && Array.isArray(data) && data.length > 0) {
         setPlans(data);
       } else {
@@ -124,11 +138,9 @@ const PlansModal: React.FC<PlansModalProps> = ({ open, onClose, prefillEmail = '
     setPixLoading(true);
     setPixError(null);
     try {
-      const trialExpiration = accessStatus === 'trial' ? trialEndsAt : null;
       const result = await createPixPayment({
         email: pixEmail,
         planType: pixPlan,
-        expiresAt: trialExpiration,
       });
       setPixData(result);
     } catch (err: any) {
@@ -287,12 +299,14 @@ const PlansModal: React.FC<PlansModalProps> = ({ open, onClose, prefillEmail = '
                       >
                         Assinar {plan.name} (Cartão)
                       </button>
-                      <button
-                        onClick={() => handlePixOpen(plan.interval)}
-                        className="w-full py-3 px-6 rounded-lg font-semibold transition-all bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg"
-                      >
-                        Pagar com Pix
-                      </button>
+                      {accessStatus !== 'trial' && (
+                        <button
+                          onClick={() => handlePixOpen(plan.interval)}
+                          className="w-full py-3 px-6 rounded-lg font-semibold transition-all bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg"
+                        >
+                          Pagar com Pix
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -313,6 +327,7 @@ const PlansModal: React.FC<PlansModalProps> = ({ open, onClose, prefillEmail = '
         open={showSubscription}
         onClose={handleCloseSubscription}
         preSelectedPlan={selectedPlan}
+        prefillEmail={accountEmail}
       />
 
       {pixOpen && (
@@ -334,10 +349,12 @@ const PlansModal: React.FC<PlansModalProps> = ({ open, onClose, prefillEmail = '
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               Plano selecionado: {pixPlan === 'annual' ? 'Anual' : 'Mensal'}
             </p>
-            {accessStatus === 'trial' && trialEndsAt && (
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+              O Pix é um pagamento único e não ativa cobrança recorrente. Ao vencer o período pago, o acesso será bloqueado até uma nova confirmação de pagamento.
+            </div>
+            {accessStatus === 'trial' && (
               <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200">
-                Este Pix foi alinhado ao seu teste grátis e pode ser pago antes ou no fim do período.
-                Se não houver aprovação, o acesso será bloqueado automaticamente ao encerrar o trial.
+                Para iniciar uma assinatura com cobrança automática após os cinco dias grátis, escolha a opção de cartão.
               </div>
             )}
 
@@ -351,7 +368,7 @@ const PlansModal: React.FC<PlansModalProps> = ({ open, onClose, prefillEmail = '
               onChange={(e) => setPixEmail(e.target.value)}
               className="w-full mb-3 p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               placeholder="seu@email.com"
-              readOnly={Boolean(currentUser?.email)}
+              readOnly={Boolean(accountEmail)}
             />
 
             <button
@@ -359,7 +376,7 @@ const PlansModal: React.FC<PlansModalProps> = ({ open, onClose, prefillEmail = '
               disabled={pixLoading}
               className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded font-semibold disabled:opacity-60"
             >
-              {pixLoading ? 'Gerando Pix...' : accessStatus === 'trial' ? 'Gerar Pix do teste' : 'Gerar Pix'}
+              {pixLoading ? 'Gerando Pix...' : 'Gerar Pix'}
             </button>
 
             {pixData?.qrCodeBase64 && (

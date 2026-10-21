@@ -37,7 +37,11 @@ Defina no ambiente de build (ex.: Hostinger/Netlify/Render):
 ### Webhooks
 - `POST /api/payments/webhooks`
 
-> O webhook atual processa eventos de **assinaturas** (`preapproval`).
+O webhook processa atualizações de assinaturas e pagamentos. Configure no painel os eventos de pré-aprovação e pagamentos autorizados. O backend consulta o status diretamente na API do Mercado Pago antes de atualizar o acesso.
+
+Os planos mensal e anual são criados no Mercado Pago e persistidos no banco na primeira chamada a `GET /api/payments/plans`. A assinatura de cartão usa a data de encerramento do trial cadastrado no SORED como início da cobrança; assim, cadastrar o cartão durante o trial não reinicia os cinco dias.
+
+O Pix é um pagamento avulso e não permite cobrança recorrente automática. No período de trial, a tela prioriza assinatura por cartão. Pagamentos Pix aprovados liberam somente o período comprado e o acesso é bloqueado quando esse período vencer sem renovação.
 
 ## 4) URLs e Webhooks no Mercado Pago
 

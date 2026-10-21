@@ -3,7 +3,12 @@ const router = express.Router();
 const { MercadoPagoConfig, PreApproval, PreApprovalPlan, Payment } = require('mercadopago');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
-const { setUserAccessStatus } = require('../services/accessControl.cjs');
+const {
+  ensureUserTrial,
+  parseDatabaseDateTime,
+  reconcileUserAccess,
+  setUserAccessStatus,
+} = require('../services/accessControl.cjs');
 const dotenv = require('dotenv');
 
 dotenv.config();
@@ -11,9 +16,16 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 // Inicialização Preguiçosa do SDK Mercado Pago
 let mpConfig = null;
+function getMPAccessToken() {
+  const token = process.env.MP_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN;
+  if (!token) {
+    throw new Error('Configure MP_ACCESS_TOKEN ou MERCADO_PAGO_ACCESS_TOKEN no ambiente');
+  }
+  return token;
+}
+
 function getMP() {
-  const token = process.env.MP_ACCESS_TOKEN;
-  if (!token) throw new Error('MP_ACCESS_TOKEN não está definido no ambiente/.env');
+  const token = getMPAccessToken();
   
   if (!mpConfig) {
     const mpClient = new MercadoPagoConfig({ accessToken: token });
@@ -28,11 +40,9 @@ function getMP() {
 }
 
 const planConfig = {
-  monthly: { amount: 100, description: 'Plano Mensal SORED' },
-  annual: { amount: 1100, description: 'Plano Anual SORED' },
+  monthly: { amount: 100, description: 'Plano Mensal SORED', frequency: 1 },
+  annual: { amount: 1100, description: 'Plano Anual SORED', frequency: 12 },
 };
-
-const TRIAL_DAYS = 5;
 
 function getPlanDurationMs(planType) {
   return planType === 'annual' ? 365 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
@@ -51,6 +61,39 @@ async function createMPPlan({ planType, price, frequency, frequencyType }) {
     if (err.response) console.error('MP Details:', JSON.stringify(err.response, null, 2));
     throw err;
   }
+}
+
+async function ensurePlan(planType) {
+  const config = planConfig[planType];
+  if (!config) {
+    throw new Error(`Tipo de plano inválido: ${planType}`);
+  }
+
+  const [rows] = await db.query('SELECT * FROM plans WHERE planType = ? LIMIT 1', [planType]);
+  if (rows[0]) {
+    return rows[0];
+  }
+
+  const frequencyType = 'months';
+  const mpPlanId = await createMPPlan({
+    planType,
+    price: config.amount,
+    frequency: config.frequency,
+    frequencyType,
+  });
+  await db.query(
+    'INSERT INTO plans (planType, mpPlanId, price, frequency, frequencyType) VALUES (?, ?, ?, ?, ?)',
+    [planType, mpPlanId, config.amount, config.frequency, frequencyType]
+  );
+
+  const [createdRows] = await db.query('SELECT * FROM plans WHERE planType = ? LIMIT 1', [planType]);
+  return createdRows[0] || {
+    planType,
+    mpPlanId,
+    price: config.amount,
+    frequency: config.frequency,
+    frequencyType,
+  };
 }
 
 // FORMAT DATETIME
@@ -80,21 +123,14 @@ function buildPlanBody({ planType, price, frequency, frequencyType }) {
       frequency_type: frequencyType,
       transaction_amount: price,
       currency_id: 'BRL',
-      free_trial: {
-        frequency: TRIAL_DAYS,
-        frequency_type: 'days',
-      },
     },
     back_url: successUrl,
     payment_methods_allowed: { payment_types: [{ id: 'credit_card' }] },
   };
 }
 
-async function syncMPPlanTrial(planId, planBody) {
-  const token = process.env.MP_ACCESS_TOKEN;
-  if (!token) {
-    throw new Error('MP_ACCESS_TOKEN não está definido no ambiente/.env');
-  }
+async function syncMPPlan(planId, planBody) {
+  const token = getMPAccessToken();
 
   const response = await fetch(`https://api.mercadopago.com/preapproval_plan/${planId}`, {
     method: 'PUT',
@@ -201,33 +237,16 @@ async function activatePixAccess(paymentId, paymentDetails = null) {
 // GET /plans: Retorna os planos existentes no banco
 router.get('/plans', async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT * FROM plans');
-    
-    // Se não houver planos, retorna nulo mas com status 200 (evita erro 500 no frontend)
-    if (!rows || rows.length === 0) {
-      // Fallback para planos padrão se o banco estiver vazio
-      return res.json({ 
-        monthlyPlan: { planType: 'monthly', price: 100 }, 
-        annualPlan: { planType: 'annual', price: 1100 } 
-      });
-    }
-
-    const plans = rows.reduce((acc, p) => {
-      acc[p.planType] = p;
-      return acc;
-    }, {});
-    
-    res.json({ 
-      monthlyPlan: plans.monthly || null, 
-      annualPlan: plans.annual || null 
-    });
+    const [monthlyPlan, annualPlan] = await Promise.all([
+      ensurePlan('monthly'),
+      ensurePlan('annual'),
+    ]);
+    return res.json({ monthlyPlan, annualPlan });
   } catch (error) {
     console.error('❌ [GET Plans Error]:', error.message);
-    // Retorna planos padrão em caso de erro no banco (fallback resiliente)
-    res.json({ 
-      monthlyPlan: { planType: 'monthly', price: 100 }, 
-      annualPlan: { planType: 'annual', price: 1100 },
-      warning: 'Operando em modo de fallback (Banco de Dados indisponível)'
+    return res.status(503).json({
+      error: 'Não foi possível carregar os planos do Mercado Pago',
+      message: error.message,
     });
   }
 });
@@ -235,41 +254,24 @@ router.get('/plans', async (req, res) => {
 // POST /plans: Cria planos mensal e anual
 router.post('/plans', async (req, res) => {
   try {
-    // Cria plano mensal
-    let [rows] = await db.query('SELECT * FROM plans WHERE planType = ? LIMIT 1', ['monthly']);
-    let monthlyPlan = rows[0];
-    if (!monthlyPlan) {
-      const mpPlanId = await createMPPlan({ planType: 'monthly', price: 100, frequency: 1, frequencyType: 'months' });
-      await db.query(
-        'INSERT INTO plans (planType, mpPlanId, price, frequency, frequencyType) VALUES (?, ?, ?, ?, ?)',
-        ['monthly', mpPlanId, 100, 1, 'months']
-      );
-      const [mRows] = await db.query('SELECT * FROM plans WHERE planType = ? LIMIT 1', ['monthly']);
-      monthlyPlan = mRows[0];
-    } else {
-      const monthlyBody = buildPlanBody({ planType: 'monthly', price: monthlyPlan.price, frequency: monthlyPlan.frequency, frequencyType: monthlyPlan.frequencyType });
-      await syncMPPlanTrial(monthlyPlan.mpPlanId, monthlyBody);
-    }
-    // Cria plano anual
-    let [aRows] = await db.query('SELECT * FROM plans WHERE planType = ? LIMIT 1', ['annual']);
-    let annualPlan = aRows[0];
-    if (!annualPlan) {
-      const mpPlanId = await createMPPlan({ 
-        planType: 'annual', 
-        price: 1100, 
-        frequency: 12, 
-        frequencyType: 'months' 
-      });
-      await db.query(
-        'INSERT INTO plans (planType, mpPlanId, price, frequency, frequencyType) VALUES (?, ?, ?, ?, ?)',
-        ['annual', mpPlanId, 1100, 12, 'months']
-      );
-      const [aNewRows] = await db.query('SELECT * FROM plans WHERE planType = ? LIMIT 1', ['annual']);
-      annualPlan = aNewRows[0];
-    } else {
-      const annualBody = buildPlanBody({ planType: 'annual', price: annualPlan.price, frequency: annualPlan.frequency, frequencyType: annualPlan.frequencyType });
-      await syncMPPlanTrial(annualPlan.mpPlanId, annualBody);
-    }
+    const [monthlyPlan, annualPlan] = await Promise.all([
+      ensurePlan('monthly'),
+      ensurePlan('annual'),
+    ]);
+    await Promise.all([
+      syncMPPlan(monthlyPlan.mpPlanId, buildPlanBody({
+        planType: 'monthly',
+        price: monthlyPlan.price,
+        frequency: monthlyPlan.frequency,
+        frequencyType: monthlyPlan.frequencyType,
+      })),
+      syncMPPlan(annualPlan.mpPlanId, buildPlanBody({
+        planType: 'annual',
+        price: annualPlan.price,
+        frequency: annualPlan.frequency,
+        frequencyType: annualPlan.frequencyType,
+      })),
+    ]);
     res.status(201).json({ monthlyPlan, annualPlan });
   } catch (error) {
     const fs = require('fs');
@@ -293,7 +295,9 @@ router.post('/pix', async (req, res) => {
       return res.status(400).json({ error: 'planType inválido' });
     }
 
-    const { amount, description } = planConfig[planType];
+    const plan = await ensurePlan(planType);
+    const amount = Number(plan.price);
+    const description = planConfig[planType].description;
     const idempotencyKey = uuidv4();
 
     const body = {
@@ -380,19 +384,18 @@ router.post('/subscriptions', async (req, res) => {
   try {
     const { email, token, planType } = req.body;
     if (!email || !token || !planType) return res.status(400).json({ error: 'email, token e planType são obrigatórios' });
-    
-    const [pRows] = await db.query('SELECT * FROM plans WHERE planType = ? LIMIT 1', [planType]);
-    const plan = pRows[0];
-    if (!plan) return res.status(404).json({ error: 'Plano não encontrado' });
+    if (!planConfig[planType]) return res.status(400).json({ error: 'planType inválido' });
+
+    const plan = await ensurePlan(planType);
     const planBody = buildPlanBody({
       planType,
       price: plan.price,
       frequency: plan.frequency,
       frequencyType: plan.frequencyType,
     });
-    await syncMPPlanTrial(plan.mpPlanId, planBody);
+    await syncMPPlan(plan.mpPlanId, planBody);
 
-    let [uRows] = await db.query('SELECT * FROM users WHERE email = ? LIMIT 1', [email]);
+    let [uRows] = await db.query('SELECT * FROM users WHERE email = ? LIMIT 1', [email.trim().toLowerCase()]);
     let user = uRows[0];
     if (!user) {
       // Create user if not created
@@ -401,11 +404,14 @@ router.post('/subscriptions', async (req, res) => {
       const tenantId = `T-${Date.now()}`;
       await db.query('INSERT INTO tenants (id, company_name) VALUES (?, ?)', [tenantId, 'Empresa Padrão']);
       const pwHash = await bcrypt.hash(uuidv4(), 10);
-      await db.query('INSERT INTO users (id, email, password_hash, tenant_id) VALUES (?, ?, ?, ?)', [userId, email, pwHash, tenantId]);
+      await db.query('INSERT INTO users (id, email, password_hash, tenant_id) VALUES (?, ?, ?, ?)', [userId, email.trim().toLowerCase(), pwHash, tenantId]);
       
       const [uNewRows] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
       user = uNewRows[0];
     }
+    const userTrial = await ensureUserTrial(user.id);
+    const trialEndsAt = userTrial.trial_ends_at ? parseDatabaseDateTime(userTrial.trial_ends_at) : null;
+    const trialIsActive = trialEndsAt && trialEndsAt.getTime() > Date.now();
     const baseFrontendUrl = process.env.FRONTEND_URL_PRODUCTION || process.env.FRONTEND_URL || (isProduction ? '' : 'http://localhost:5173');
     if (!baseFrontendUrl) {
       throw new Error('FRONTEND_URL_PRODUCTION não está configurada para produção');
@@ -419,13 +425,20 @@ router.post('/subscriptions', async (req, res) => {
       card_token_id: token,
       back_url: successUrl,
       status: 'authorized',
+      auto_recurring: {
+        frequency: plan.frequency,
+        frequency_type: plan.frequencyType,
+        transaction_amount: Number(plan.price),
+        currency_id: 'BRL',
+        ...(trialIsActive ? { start_date: trialEndsAt.toISOString() } : {}),
+      },
     };
     const { preApproval } = getMP();
     const result = await preApproval.create({ body });
     console.log(`✅ [Subscription Success]: ID ${result.id} para ${email}`);
 
     // Salva assinatura no banco
-    const nextBillRaw = result.auto_recurring?.next_payment_date;
+    const nextBillRaw = result.auto_recurring?.next_payment_date || (trialIsActive ? trialEndsAt : null);
     const nextBilling = nextBillRaw ? formatDT(nextBillRaw) : null;
 
     const [rs] = await db.query(`INSERT INTO subscriptions (userId, mpSubscriptionId, status, planType, nextBilling)
@@ -443,21 +456,13 @@ router.post('/subscriptions', async (req, res) => {
     res.status(201).json(sRows[0]);
   } catch (error) {
     console.error('❌ [Subscription Error]:', error.message);
-    const fs = require('fs');
-    
-    let detailedError = error.message;
     if (error.response) {
-        detailedError = JSON.stringify(error.response, null, 2);
-        console.error('📋 Detalhes MP:', detailedError);
+      console.error('📋 Detalhes MP:', JSON.stringify(error.response, null, 2));
     }
-
-    const logEntry = `\n[${new Date().toISOString()}] SUBSCRIPTION_FAIL: ${email} | Plan: ${planType} | Error: ${detailedError}\n`;
-    fs.appendFileSync('mp_subscription_errors.log', logEntry);
 
     res.status(error.response?.status || 500).json({ 
         error: 'Erro ao processar assinatura com cartão',
-        message: error.message,
-        details: error.response || null
+        message: 'Não foi possível criar a assinatura. Verifique a configuração do Mercado Pago e tente novamente.',
     });
   }
 });
@@ -480,9 +485,6 @@ router.get('/subscriptions/:id', async (req, res) => {
 // POST /webhooks: Recebe notificações do Mercado Pago
 router.post('/webhooks', async (req, res) => {
   try {
-    const signatureHeader = req.headers['x-signature'];
-    const requestId = req.headers['x-request-id'];
-
     let rawBody = req.body;
     let payload = {};
 
@@ -496,11 +498,14 @@ router.post('/webhooks', async (req, res) => {
       console.log('[Webhook] Recebido MP Notificação:', payload.type, 'Action:', payload.action);
     }
 
-    if (payload.type !== 'preapproval' && payload.action !== 'payment.created' && payload.action !== 'payment.updated') {
+    const isPreapprovalEvent = ['preapproval', 'subscription_preapproval'].includes(payload.type);
+    const isSubscriptionPaymentEvent = payload.type === 'subscription_authorized_payment';
+    const isPaymentEvent = payload.type === 'payment' || ['payment.created', 'payment.updated'].includes(payload.action);
+    if (!isPreapprovalEvent && !isSubscriptionPaymentEvent && !isPaymentEvent) {
       return res.status(200).send('ignorado');
     }
 
-    if (payload.type === 'preapproval') {
+    if (isPreapprovalEvent) {
       const mpSubscriptionId = payload.data && payload.data.id;
       if (!mpSubscriptionId) return res.status(400).send('id ausente');
       
@@ -510,35 +515,37 @@ router.post('/webhooks', async (req, res) => {
       if (subscription) {
         const { preApproval } = getMP();
         const mpResult = await preApproval.findById({ id: mpSubscriptionId });
-        const newStatus = mpResult.status;
-        
-        if (subscription.status !== newStatus) {
-          let nextBilling = subscription.nextBilling;
-          let gracePeriodUntil = subscription.gracePeriodUntil;
-
-          if (mpResult.auto_recurring?.next_payment_date) {
-            nextBilling = formatDT(mpResult.auto_recurring.next_payment_date);
-          }
-
-          if (["pending", "failure"].includes(newStatus)) {
-            const grace = new Date();
-            grace.setDate(grace.getDate() + 3);
-            gracePeriodUntil = formatDT(grace);
-          } else {
-            gracePeriodUntil = null;
-          }
-          
-          await db.query('UPDATE subscriptions SET status = ?, nextBilling = ?, gracePeriodUntil = ? WHERE id = ?', [
-            newStatus,
-            nextBilling,
-            gracePeriodUntil,
-            subscription.id
-          ]);
-
-          if (["authorized", "active", "paid", "approved"].includes(newStatus)) {
-            await setUserAccessStatus(subscription.userId, 'paid');
-          } else if (gracePeriodUntil) {
-            await setUserAccessStatus(subscription.userId, 'grace');
+        const newStatus = mpResult.status || subscription.status;
+        const nextBilling = formatDT(mpResult.auto_recurring?.next_payment_date) || subscription.nextBilling;
+        await db.query(
+          'UPDATE subscriptions SET status = ?, nextBilling = ?, gracePeriodUntil = NULL WHERE id = ?',
+          [newStatus, nextBilling, subscription.id]
+        );
+        await reconcileUserAccess(subscription.userId);
+      }
+    } else if (isSubscriptionPaymentEvent) {
+      const paymentId = payload.data && payload.data.id;
+      if (paymentId) {
+        const { mpPayment, preApproval } = getMP();
+        const paymentResult = await mpPayment.get({ id: paymentId });
+        const mpSubscriptionId = paymentResult.preapproval_id || paymentResult.preapprovalId;
+        if (mpSubscriptionId) {
+          const [rows] = await db.query(
+            'SELECT * FROM subscriptions WHERE mpSubscriptionId = ? LIMIT 1',
+            [mpSubscriptionId]
+          );
+          const subscription = rows[0];
+          if (subscription) {
+            const mpSubscription = await preApproval.findById({ id: mpSubscriptionId });
+            const paymentApproved = paymentResult.status === 'approved';
+            const newStatus = paymentApproved ? (mpSubscription.status || 'authorized') : 'failure';
+            const nextBilling = formatDT(mpSubscription.auto_recurring?.next_payment_date)
+              || subscription.nextBilling;
+            await db.query(
+              'UPDATE subscriptions SET status = ?, nextBilling = ?, gracePeriodUntil = NULL WHERE id = ?',
+              [newStatus, nextBilling, subscription.id]
+            );
+            await reconcileUserAccess(subscription.userId);
           }
         }
       }

@@ -100,8 +100,16 @@ function createTrialWindow() {
 
 function isFuture(datetime) {
   if (!datetime) return false;
-  const value = new Date(datetime);
+  const value = parseDatabaseDateTime(datetime);
   return !Number.isNaN(value.getTime()) && value.getTime() > Date.now();
+}
+
+function parseDatabaseDateTime(datetime) {
+  if (datetime instanceof Date) return datetime;
+  if (typeof datetime === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(datetime)) {
+    return new Date(`${datetime.replace(' ', 'T')}Z`);
+  }
+  return new Date(datetime);
 }
 
 function collectErrorMessages(error, seen = new Set()) {
@@ -275,8 +283,8 @@ async function ensureTrial(userId) {
 
 async function reconcileAccess(userId) {
   const user = await ensureTrial(userId);
-  const trialEndsAt = user.trialEndsAt ? new Date(user.trialEndsAt) : null;
-  const trialActive = trialEndsAt ? trialEndsAt.getTime() >= Date.now() : false;
+  const trialEndsAt = user.trialEndsAt ? parseDatabaseDateTime(user.trialEndsAt) : null;
+  const trialActive = trialEndsAt ? trialEndsAt.getTime() > Date.now() : false;
 
   const allowed = trialActive;
   const accessStatus = trialActive ? 'trial' : 'blocked';

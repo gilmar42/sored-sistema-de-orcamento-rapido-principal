@@ -6,10 +6,12 @@ const mockMercadoPagoState = {
   preApprovalCreateResponse: null,
   preApprovalFindByIdResponse: null,
   preApprovalPlanCreateResponse: null,
+  preApprovalCreateBody: null,
 };
 
 let mockPaymentSequence = 0;
 let mockSubscriptionSequence = 0;
+let mockPlanSequence = 0;
 
 const mockDbState = {
   payments: [],
@@ -27,6 +29,7 @@ function resetDbState() {
   mockDbState.plans = [];
   mockPaymentSequence = 0;
   mockSubscriptionSequence = 0;
+  mockPlanSequence = 0;
 }
 
 function normalizeSql(sql) {
@@ -93,6 +96,11 @@ mockDb.query = jest.fn(async (sql, params = []) => {
     return [[cloneRow(row)]];
   }
 
+  if (normalized.includes('select * from users where id = ?')) {
+    const row = findUserById(params[0]);
+    return [[cloneRow(row)]];
+  }
+
   if (normalized.includes('insert into tenants (id, company_name) values (?, ?)')) {
     const [id, companyName] = params;
     mockDbState.tenants.push({
@@ -112,6 +120,25 @@ mockDb.query = jest.fn(async (sql, params = []) => {
       access_status: accessStatus || 'trial',
     });
     return [{ insertId: id }];
+  }
+
+  if (normalized.includes('select * from plans where plantype = ? limit 1')) {
+    const row = mockDbState.plans.find((plan) => plan.planType === params[0]) || null;
+    return [[cloneRow(row)]];
+  }
+
+  if (normalized.includes('insert into plans')) {
+    const [planType, mpPlanId, price, frequency, frequencyType] = params;
+    const record = {
+      id: mockDbState.plans.length + 1,
+      planType,
+      mpPlanId,
+      price,
+      frequency,
+      frequencyType,
+    };
+    mockDbState.plans.push(record);
+    return [{ insertId: record.id }];
   }
 
   if (normalized.includes('update users set access_status = ? where id = ?')) {
@@ -155,6 +182,17 @@ mockDb.query = jest.fn(async (sql, params = []) => {
     return [{ affectedRows: subscription ? 1 : 0 }];
   }
 
+  if (normalized.includes('update subscriptions set status = ?, nextbilling = ?, graceperioduntil = null where id = ?')) {
+    const [status, nextBilling, id] = params;
+    const subscription = mockDbState.subscriptions.find((item) => item.id === Number(id));
+    if (subscription) {
+      subscription.status = status;
+      subscription.nextBilling = nextBilling;
+      subscription.gracePeriodUntil = null;
+    }
+    return [{ affectedRows: subscription ? 1 : 0 }];
+  }
+
   if (normalized.includes('select * from subscriptions where id = ?')) {
     const id = Number(params[0]);
     const row = mockDbState.subscriptions.find((subscription) => subscription.id === id) || null;
@@ -174,6 +212,13 @@ mockDb.getConnection = jest.fn(async () => ({
 }));
 
 const mockAccessControl = {
+  ensureUserTrial: jest.fn(async (userId) => findUserById(userId)),
+  parseDatabaseDateTime: jest.fn((value) => {
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
+      return new Date(`${value.replace(' ', 'T')}Z`);
+    }
+    return new Date(value);
+  }),
   setUserAccessStatus: jest.fn(async (userId, accessStatus) => {
     const user = findUserById(userId);
     if (user) {
@@ -182,7 +227,6 @@ const mockAccessControl = {
   }),
   reconcileUserAccess: jest.fn(),
   evaluateSubscriptionAccess: jest.fn(),
-  ensureUserTrial: jest.fn(),
 };
 
 jest.mock('mercadopago', () => {
@@ -194,12 +238,14 @@ jest.mock('mercadopago', () => {
 
   class PreApprovalPlan {
     async create() {
-      return mockMercadoPagoState.preApprovalPlanCreateResponse || { id: `plan-${Date.now()}` };
+      mockPlanSequence += 1;
+      return mockMercadoPagoState.preApprovalPlanCreateResponse || { id: `plan-${mockPlanSequence}` };
     }
   }
 
   class PreApproval {
-    async create() {
+    async create({ body }) {
+      mockMercadoPagoState.preApprovalCreateBody = body;
       return (
         mockMercadoPagoState.preApprovalCreateResponse || {
           id: `sub-${Date.now()}`,
@@ -324,18 +370,150 @@ async function createPixPayment() {
 }
 
 describe('Mercado Pago Integration', () => {
+  const originalMpToken = process.env.MP_ACCESS_TOKEN;
+  const originalMercadoPagoToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
+  const originalFetch = global.fetch;
+
   beforeEach(() => {
     resetDbState();
     jest.clearAllMocks();
+    delete process.env.MP_ACCESS_TOKEN;
+    process.env.MERCADO_PAGO_ACCESS_TOKEN = 'test-access-token';
+    global.fetch = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({}),
+    }));
     mockMercadoPagoState.paymentCreateResponse = null;
     mockMercadoPagoState.paymentGetResponse = null;
     mockMercadoPagoState.preApprovalCreateResponse = null;
     mockMercadoPagoState.preApprovalFindByIdResponse = null;
     mockMercadoPagoState.preApprovalPlanCreateResponse = null;
+    mockMercadoPagoState.preApprovalCreateBody = null;
   });
 
   afterAll(() => {
     jest.restoreAllMocks();
+    if (originalMpToken === undefined) {
+      delete process.env.MP_ACCESS_TOKEN;
+    } else {
+      process.env.MP_ACCESS_TOKEN = originalMpToken;
+    }
+    if (originalMercadoPagoToken === undefined) {
+      delete process.env.MERCADO_PAGO_ACCESS_TOKEN;
+    } else {
+      process.env.MERCADO_PAGO_ACCESS_TOKEN = originalMercadoPagoToken;
+    }
+    if (originalFetch === undefined) {
+      delete global.fetch;
+    } else {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it('deve provisionar os planos quando o banco ainda não os possui', async () => {
+    const res = await request(app).get('/api/payments/plans');
+
+    expect(res.status).toBe(200);
+    expect(res.body.monthlyPlan).toMatchObject({
+      planType: 'monthly',
+      price: 100,
+      mpPlanId: 'plan-1',
+    });
+    expect(res.body.annualPlan).toMatchObject({
+      planType: 'annual',
+      price: 1100,
+      mpPlanId: 'plan-2',
+    });
+    expect(mockDbState.plans).toHaveLength(2);
+  });
+
+  it('deve iniciar a cobrança no fim do trial original, sem reiniciar cinco dias', async () => {
+    await request(app).get('/api/payments/plans').expect(200);
+    const trialEndsAt = new Date(Math.floor((Date.now() + 2 * 24 * 60 * 60 * 1000) / 1000) * 1000);
+    mockDbState.users.push({
+      id: 'user-1',
+      email: 'jest@exemplo.com',
+      tenant_id: 'tenant-1',
+      trial_started_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+      trial_ends_at: trialEndsAt.toISOString().slice(0, 19).replace('T', ' '),
+      access_status: 'trial',
+    });
+    mockMercadoPagoState.preApprovalCreateResponse = {
+      id: 'subscription-1',
+      status: 'authorized',
+      auto_recurring: {
+        next_payment_date: trialEndsAt.toISOString(),
+      },
+    };
+
+    const res = await request(app)
+      .post('/api/payments/subscriptions')
+      .send({
+        email: 'jest@exemplo.com',
+        token: 'card-token',
+        planType: 'monthly',
+      });
+
+    expect(res.status).toBe(201);
+    expect(mockMercadoPagoState.preApprovalCreateBody.auto_recurring.start_date).toBe(trialEndsAt.toISOString());
+    expect(mockMercadoPagoState.preApprovalCreateBody.auto_recurring.transaction_amount).toBe(100);
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/preapproval_plan/plan-1'),
+      expect.objectContaining({
+        method: 'PUT',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer test-access-token',
+        }),
+      })
+    );
+    expect(mockDbState.subscriptions[0].nextBilling).toBe(trialEndsAt.toISOString().slice(0, 19).replace('T', ' '));
+  });
+
+  it('deve bloquear a assinatura quando uma cobrança recorrente falha', async () => {
+    await request(app).get('/api/payments/plans').expect(200);
+    mockDbState.users.push({
+      id: 'user-1',
+      email: 'jest@exemplo.com',
+      tenant_id: 'tenant-1',
+      trial_started_at: '2026-10-01 00:00:00',
+      trial_ends_at: '2026-10-06 00:00:00',
+      access_status: 'paid',
+    });
+    mockMercadoPagoState.preApprovalCreateResponse = {
+      id: 'subscription-recurring',
+      status: 'authorized',
+      auto_recurring: {
+        next_payment_date: '2026-11-20T12:00:00.000Z',
+      },
+    };
+    await request(app)
+      .post('/api/payments/subscriptions')
+      .send({
+        email: 'jest@exemplo.com',
+        token: 'card-token',
+        planType: 'monthly',
+      })
+      .expect(201);
+
+    mockMercadoPagoState.paymentGetResponse = {
+      id: 'recurring-payment-1',
+      status: 'rejected',
+      preapproval_id: 'subscription-recurring',
+    };
+    const res = await request(app)
+      .post('/api/payments/webhooks')
+      .send({
+        type: 'subscription_authorized_payment',
+        action: 'created',
+        data: { id: 'recurring-payment-1' },
+      });
+
+    expect(res.status).toBe(200);
+    expect(mockDbState.subscriptions[0]).toMatchObject({
+      status: 'failure',
+      gracePeriodUntil: null,
+    });
+    expect(mockAccessControl.reconcileUserAccess).toHaveBeenCalledWith('user-1');
   });
 
   it('deve criar um pagamento PIX', async () => {

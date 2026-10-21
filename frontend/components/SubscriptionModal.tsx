@@ -6,12 +6,18 @@ interface SubscriptionModalProps {
   open: boolean;
   onClose: () => void;
   preSelectedPlan?: 'monthly' | 'annual' | null;
+  prefillEmail?: string;
 }
 
-const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ open, onClose, preSelectedPlan = null }) => {
+const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
+  open,
+  onClose,
+  preSelectedPlan = null,
+  prefillEmail = '',
+}) => {
   const [plans, setPlans] = useState<any>(null);
   const [selected, setSelected] = useState<'monthly' | 'annual' | null>(preSelectedPlan);
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(prefillEmail);
   const [cardToken, setCardToken] = useState('');
   const [card, setCard] = useState({
     number: '',
@@ -21,31 +27,47 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ open, onClose, pr
     docType: 'CPF',
     docNumber: '',
   });
-  const mpKey = (import.meta.env.VITE_MP_PUBLIC_KEY || (window as any).VITE_MP_PUBLIC_KEY || '') as string;
-  console.log(`[SubscriptionModal] MP Key status: ${mpKey ? 'Present (' + mpKey.slice(0, 10) + '...)' : 'MISSING'}`);
+  const mpKey = (typeof process !== 'undefined' && process.env.VITE_MP_PUBLIC_KEY)
+    || (window as any).VITE_MP_PUBLIC_KEY
+    || '';
   const mp = useMercadoPago(mpKey);
   const formRef = useRef<HTMLFormElement>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [plansError, setPlansError] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (open) {
-      // Buscar planos da API, mas não mostrar erro se falhar
-      getPlans().then(setPlans).catch(() => {
-        // Silenciosamente falhar - os botões ainda funcionam
+      setPlansError(null);
+      setPlans(null);
+      getPlans().then(setPlans).catch((loadError: any) => {
         setPlans(null);
+        setPlansError(
+          loadError?.response?.data?.message
+            || loadError?.response?.data?.error
+            || 'Não foi possível carregar os planos. Tente novamente em instantes.'
+        );
       });
-      // Se recebeu um plano pré-selecionado, usar ele
       if (preSelectedPlan) {
         setSelected(preSelectedPlan);
       }
+      if (prefillEmail) {
+        setEmail(prefillEmail);
+      }
     } else {
-      // Limpar erro quando fechar
       setError(null);
       setResult(null);
     }
-  }, [open, preSelectedPlan]);
+  }, [open, preSelectedPlan, prefillEmail]);
+
+  const formatPrice = (planType: 'monthly' | 'annual', fallback: number) => {
+    const price = Number(plans?.[`${planType}Plan`]?.price ?? fallback);
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(price);
+  };
 
   const handleSubscribe = async () => {
     setLoading(true);
@@ -86,8 +108,12 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ open, onClose, pr
         <h2 className="text-xl font-bold mb-4">Assine um Plano</h2>
         {plans ? (
           <div className="mb-4">
-            <button className={`mr-2 px-4 py-2 rounded ${selected==='monthly'?'bg-blue-500 text-white':'bg-gray-200'}`} onClick={()=>setSelected('monthly')}>Mensal R$100</button>
-            <button className={`px-4 py-2 rounded ${selected==='annual'?'bg-blue-500 text-white':'bg-gray-200'}`} onClick={()=>setSelected('annual')}>Anual R$1100</button>
+            <button className={`mr-2 px-4 py-2 rounded ${selected==='monthly'?'bg-blue-500 text-white':'bg-gray-200'}`} onClick={()=>setSelected('monthly')}>Mensal {formatPrice('monthly', 100)}</button>
+            <button className={`px-4 py-2 rounded ${selected==='annual'?'bg-blue-500 text-white':'bg-gray-200'}`} onClick={()=>setSelected('annual')}>Anual {formatPrice('annual', 1100)}</button>
+          </div>
+        ) : plansError ? (
+          <div role="alert" className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            {plansError}
           </div>
         ) : <div>Carregando planos...</div>}
         <input className="w-full mb-2 p-2 border rounded" placeholder="Seu e-mail" value={email} onChange={e=>setEmail(e.target.value)} />
@@ -105,7 +131,7 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ open, onClose, pr
           </select>
           <input className="w-2/3 mb-2 p-2 border rounded" placeholder={`Número do ${card.docType}`} value={card.docNumber} onChange={e=>setCard(c=>({...c,docNumber:e.target.value}))} maxLength={18} />
         </div>
-        <button className="w-full bg-green-600 text-white py-2 rounded mt-2" disabled={!selected||!email||!card.number||!card.holder||!card.exp||!card.cvv||!card.docNumber||loading} onClick={handleSubscribe}>
+        <button className="w-full bg-green-600 text-white py-2 rounded mt-2" disabled={!plans||!selected||!email||!card.number||!card.holder||!card.exp||!card.cvv||!card.docNumber||loading} onClick={handleSubscribe}>
           {loading ? 'Processando...' : 'Assinar'}
         </button>
         {error && <div className="text-red-600 mt-2 p-2 bg-red-50 rounded border border-red-200 text-sm">{error}</div>}

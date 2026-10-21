@@ -29,8 +29,8 @@ describe('SubscriptionModal', () => {
   it('exibe planos e valida campos obrigatórios', async () => {
     render(<SubscriptionModal open={true} onClose={() => {}} />);
     expect(screen.getByText(/Assine um Plano/i)).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText(/Mensal R\$100/i)).toBeInTheDocument());
-    fireEvent.click(screen.getByText(/Mensal R\$100/i));
+    await waitFor(() => expect(screen.getByText(/Mensal R\$\s*100,00/i)).toBeInTheDocument());
+    fireEvent.click(screen.getByText(/Mensal R\$\s*100,00/i));
     fireEvent.change(screen.getByPlaceholderText(/Seu e-mail/i), { target: { value: 'user@email.com' } });
     fireEvent.change(screen.getByPlaceholderText(/Número do cartão/i), { target: { value: '4111111111111111' } });
     fireEvent.change(screen.getByPlaceholderText(/Nome impresso/i), { target: { value: 'Test User' } });
@@ -44,15 +44,15 @@ describe('SubscriptionModal', () => {
 
   it('exibe erro se campos faltando', async () => {
     render(<SubscriptionModal open={true} onClose={() => {}} />);
-    await waitFor(() => expect(screen.getByText(/Mensal R\$100/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Mensal R\$\s*100,00/i)).toBeInTheDocument());
     fireEvent.click(screen.getByText(/Assinar/i));
     expect(screen.queryByText(/Assinatura criada/i)).not.toBeInTheDocument();
   });
 
   it('exibe mensagem de erro do backend', async () => {
     render(<SubscriptionModal open={true} onClose={() => {}} />);
-    await waitFor(() => expect(screen.getByText(/Mensal R\$100/i)).toBeInTheDocument());
-    fireEvent.click(screen.getByText(/Mensal R\$100/i));
+    await waitFor(() => expect(screen.getByText(/Mensal R\$\s*100,00/i)).toBeInTheDocument());
+    fireEvent.click(screen.getByText(/Mensal R\$\s*100,00/i));
     fireEvent.change(screen.getByPlaceholderText(/Seu e-mail/i), { target: { value: 'user@email.com' } });
     fireEvent.change(screen.getByPlaceholderText(/Número do cartão/i), { target: { value: '4111111111111111' } });
     fireEvent.change(screen.getByPlaceholderText(/Nome impresso/i), { target: { value: 'Test User' } });
@@ -68,7 +68,7 @@ describe('SubscriptionModal', () => {
     render(<SubscriptionModal open={true} onClose={() => {}} preSelectedPlan="annual" />);
     await waitFor(() => {
       // Verifica se o botão anual está selecionado
-      const annualButton = screen.getByText(/Anual R\$1100/i);
+      const annualButton = screen.getByText(/Anual R\$\s*1\.100,00/i);
       expect(annualButton).toHaveClass('bg-blue-500');
     });
   });

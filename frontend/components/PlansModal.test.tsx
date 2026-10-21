@@ -121,9 +121,9 @@ describe('PlansModal', () => {
       const body = document.body.textContent || '';
       expect(body).toContain('Assinar');
       expect(body).toContain('Cartão');
-      expect(body).toContain('Pagar com Pix');
       expect(body).toContain('Plano Mensal');
       expect(body).toContain('Plano Anual');
+      expect(screen.queryByText('Pagar com Pix')).not.toBeInTheDocument();
     });
   });
 
